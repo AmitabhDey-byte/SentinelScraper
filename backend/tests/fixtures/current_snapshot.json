@@ -1,0 +1,50 @@
+{
+  "data": [
+    {
+      "title": "Acer Aspire 5 Laptop",
+      "price": "$479.99",
+      "stock_status": "In stock",
+      "seller": "Example Electronics",
+      "rating": "",
+      "image_url": "https://example.com/acer.jpg",
+      "listing_url": "https://example.com/acer"
+    },
+    {
+      "title": "Lenovo IdeaPad 3 Laptop",
+      "price": "$379.99",
+      "stock_status": "In stock",
+      "seller": "Example Electronics",
+      "rating": "",
+      "image_url": "https://example.com/lenovo.jpg",
+      "listing_url": "https://example.com/lenovo"
+    },
+    {
+      "title": "Dell Inspiron 15 Laptop",
+      "price": "$579.99",
+      "stock_status": "In stock",
+      "seller": "Example Electronics",
+      "rating": "",
+      "image_url": "https://example.com/dell.jpg",
+      "listing_url": "https://example.com/dell"
+    },
+    {
+      "title": "HP Pavilion Laptop",
+      "price": "$529.99",
+      "stock_status": "In stock",
+      "seller": "Example Electronics",
+      "rating": "",
+      "image_url": "https://example.com/hp.jpg",
+      "listing_url": "https://example.com/hp"
+    },
+    {
+      "title": "ASUS VivoBook Laptop",
+      "price": "$429.99",
+      "stock_status": "In stock",
+      "seller": "Example Electronics",
+      "rating": "",
+      "image_url": "https://example.com/asus.jpg",
+      "listing_url": "https://example.com/asus"
+    }
+  ]
+}
+
