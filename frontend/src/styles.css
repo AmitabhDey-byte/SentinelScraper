@@ -1653,6 +1653,7 @@ h2 {
 .healing-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; padding: 17px 0; border-top: 1px solid #43311d; }
 .healing-actions button { padding: 11px 13px; color: var(--paper); background: transparent; border: 1px solid var(--brass-dark); font-family: "DM Mono", monospace; font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
 .healing-actions .operation-primary { color: #0a0907; background: var(--brass); border-color: var(--brass); }
+.healing-actions .operation-unlock { color: var(--brass); border-color: var(--brass-dark); }
 .healing-actions button:disabled { cursor: wait; opacity: .55; }
 .operation-transcript { display: grid; grid-template-columns: 120px 1fr; gap: 0; grid-column: 1 / -1; margin: 0 -32px; border-top: 1px solid #43311d; }
 .operation-transcript > div { display: grid; gap: 6px; padding: 17px 20px; border-right: 1px solid #43311d; }
@@ -1665,6 +1666,46 @@ h2 {
 .operation-completed { color: #d8d1a1 !important; }
 .operation-failed, .operation-completed_with_errors { color: #e3896d !important; }
 .operation-error { grid-column: 1 / -1; margin: 0 -32px; padding: 12px 20px; color: #f1b3a1; background: #3e211c; font-family: "DM Mono", monospace; font-size: 10px; }
+.operator-mode-button, .operator-lock-button {
+  padding: 9px 11px;
+  color: var(--paper-light);
+  background: transparent;
+  border: 1px solid rgba(210, 161, 90, .5);
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.operator-lock-button { color: var(--brass); border-color: var(--brass-dark); }
+.operator-console {
+  position: fixed;
+  top: 84px;
+  right: max(4vw, 28px);
+  z-index: 20;
+  width: min(370px, calc(100vw - 32px));
+  padding: 20px;
+  color: var(--paper-light);
+  background: #110e0a;
+  border: 1px solid var(--brass-dark);
+  border-top: 4px solid var(--brass);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .42);
+}
+.operator-console-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 19px; }
+.operator-console .eyebrow { color: var(--brass-dark); font-size: 8px; }
+.operator-console h2 { margin: 3px 0 0; color: var(--paper-light); font-size: 34px; }
+.operator-console-head > button { padding: 0; color: var(--paper-dark); background: transparent; border: 0; font-family: "DM Mono", monospace; font-size: 22px; line-height: 1; }
+.operator-console label { display: block; margin-bottom: 7px; color: var(--brass); font-family: "DM Mono", monospace; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+.operator-console input { width: 100%; padding: 12px; color: var(--paper-light); outline: none; background: #080706; border: 1px solid #4a351f; font-family: "DM Mono", monospace; font-size: 12px; }
+.operator-console input:focus { border-color: var(--brass); }
+.operator-console form > p, .operator-unlocked p { margin: 10px 0 0; color: var(--paper-dark); font-size: 12px; line-height: 1.5; }
+.operator-console-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 17px; }
+.operator-console-actions button, .operator-unlocked button { padding: 9px 12px; color: var(--paper-light); background: transparent; border: 1px solid #4a351f; font-family: "DM Mono", monospace; font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }
+.operator-console-actions button[type="submit"] { color: #0a0907; background: var(--brass); border-color: var(--brass); }
+.operator-console-actions button:disabled { cursor: wait; opacity: .6; }
+.operator-error { color: #f1b3a1 !important; }
+.operator-unlocked { padding: 13px; background: #0b0a07; border: 1px solid #4a351f; }
+.operator-unlocked strong { color: var(--brass); font-family: "DM Mono", monospace; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; }
+.operator-unlocked button { margin-top: 16px; }
 .content-grid { margin-top: 25px; }
 
 .scroll-observatory #signals, .scroll-observatory #network { background: #0c0a08; }
@@ -1695,6 +1736,7 @@ h2 {
   .operation-transcript ol { padding: 13px 17px; }
   .operation-transcript time { width: 58px; }
   .operation-error { margin: 0 -17px; }
+  .operator-console { top: 104px; right: 15px; }
   .intelligence-section { grid-template-columns: 1fr; min-height: 680px; padding-inline: 7vw; background-position: 57% center; }
 }
 @keyframes spin {

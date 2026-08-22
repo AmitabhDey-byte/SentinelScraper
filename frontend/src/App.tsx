@@ -280,12 +280,16 @@ const watchlistStorageKey = "sentinelscrape-watchlist";
 function HealingConsole({
   operation,
   incidents,
+  operatorUnlocked,
+  onOpenOperator,
   onScan,
   onProposeHeal,
   onApprove,
 }: {
   operation: Operation | null;
   incidents: IncidentPage;
+  operatorUnlocked: boolean;
+  onOpenOperator: () => void;
   onScan: () => void;
   onProposeHeal: (incidentId: number) => void;
   onApprove: (incidentId: number) => void;
@@ -307,10 +311,11 @@ function HealingConsole({
         <span className={operation?.status === "completed" ? "active" : ""}>04 Prove</span>
       </div>
       <div className="healing-actions">
-        {manualOperationsEnabled ? <button type="button" className="operation-primary" onClick={onScan} disabled={busy}>
+        {(manualOperationsEnabled || operatorUnlocked) ? <button type="button" className="operation-primary" onClick={onScan} disabled={busy}>
           {busy && operation?.kind === "scan" ? "Scanning collectors…" : "Run Bright Data scan"}
-        </button> : <p className="automatic-note">GitHub Actions watch is active. This panel shows the latest verified cycle.</p>}
-        {manualOperationsEnabled && openIncident && (
+        </button> : <button type="button" className="operation-unlock" onClick={onOpenOperator}>Unlock live controls</button>}
+        {!manualOperationsEnabled && !operatorUnlocked && <p className="automatic-note">GitHub Actions watch is active. Unlock only when you need a manual Bright Data run.</p>}
+        {(manualOperationsEnabled || operatorUnlocked) && openIncident && (
           <>
             <button type="button" onClick={() => onProposeHeal(openIncident.id)} disabled={busy}>
               Propose AI heal
@@ -341,6 +346,67 @@ function HealingConsole({
   );
 }
 
+function OperatorConsole({
+  unlocked,
+  busy,
+  error,
+  keyValue,
+  onKeyChange,
+  onClose,
+  onUnlock,
+  onLock,
+}: {
+  unlocked: boolean;
+  busy: boolean;
+  error: string | null;
+  keyValue: string;
+  onKeyChange: (value: string) => void;
+  onClose: () => void;
+  onUnlock: (event: FormEvent<HTMLFormElement>) => void;
+  onLock: () => void;
+}) {
+  return (
+    <motion.aside
+      className="operator-console"
+      aria-label="Operator mode"
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.18 }}
+    >
+      <div className="operator-console-head">
+        <div><p className="eyebrow">PRIVATE / OPERATOR MODE</p><h2>Live controls</h2></div>
+        <button type="button" onClick={onClose} aria-label="Close operator mode">×</button>
+      </div>
+      {unlocked ? (
+        <div className="operator-unlocked">
+          <strong>◉ Operator controls unlocked</strong>
+          <p>Live scan, heal, and approve actions are enabled for this tab only.</p>
+          <button type="button" onClick={onLock}>Lock controls</button>
+        </div>
+      ) : (
+        <form onSubmit={onUnlock}>
+          <label htmlFor="operator-key">Render operator key</label>
+          <input
+            id="operator-key"
+            type="password"
+            value={keyValue}
+            onChange={(event) => onKeyChange(event.target.value)}
+            autoComplete="off"
+            placeholder="Paste OPERATIONS_API_TOKEN"
+          />
+          <p>Validated against the API and held only in this browser tab. It is never saved to this device.</p>
+          {error && <p className="operator-error">{error}</p>}
+          <div className="operator-console-actions">
+            <button type="button" onClick={onClose}>Cancel</button>
+            <button type="submit" disabled={busy}>{busy ? "Checking…" : "Unlock"}</button>
+          </div>
+        </form>
+      )}
+    </motion.aside>
+  );
+}
+
 function DashboardPage({
   data,
   loading,
@@ -356,6 +422,8 @@ function DashboardPage({
   navigate,
   onSelectProduct,
   operation,
+  operatorUnlocked,
+  onOpenOperator,
   onScan,
   onProposeHeal,
   onApprove,
@@ -374,6 +442,8 @@ function DashboardPage({
   navigate: (route: Route) => void;
   onSelectProduct: (product: Product) => void;
   operation: Operation | null;
+  operatorUnlocked: boolean;
+  onOpenOperator: () => void;
   onScan: () => void;
   onProposeHeal: (incidentId: number) => void;
   onApprove: (incidentId: number) => void;
@@ -427,7 +497,7 @@ function DashboardPage({
       </section>
       <StatStrip data={data} />
       <CollectorRail collectors={data.collectors} />
-      <HealingConsole operation={operation} incidents={data.incidents} onScan={onScan} onProposeHeal={onProposeHeal} onApprove={onApprove} />
+      <HealingConsole operation={operation} incidents={data.incidents} operatorUnlocked={operatorUnlocked} onOpenOperator={onOpenOperator} onScan={onScan} onProposeHeal={onProposeHeal} onApprove={onApprove} />
       {error && (
         <div className="error-banner" role="alert">
           <span>Signal lost</span>
@@ -1005,6 +1075,8 @@ function ScrollObservatory({
   favorites,
   onJump,
   operation,
+  operatorUnlocked,
+  onOpenOperator,
   onScan,
   onProposeHeal,
   onApprove,
@@ -1029,6 +1101,8 @@ function ScrollObservatory({
   favorites: Product[];
   onJump: (section: string) => void;
   operation: Operation | null;
+  operatorUnlocked: boolean;
+  onOpenOperator: () => void;
   onScan: () => void;
   onProposeHeal: (incidentId: number) => void;
   onApprove: (incidentId: number) => void;
@@ -1037,7 +1111,7 @@ function ScrollObservatory({
   return (
     <div className="scroll-observatory">
       <div id="overview"><LandingPage data={data} navigate={scrollNavigate} /></div>
-      <div id="market"><DashboardPage data={data} loading={loading} error={error} siteFilter={siteFilter} siteOptions={siteOptions} queryDraft={queryDraft} onQueryDraft={onQueryDraft} onSearch={onSearch} onSiteChange={onSiteChange} onRefresh={onRefresh} onPageChange={onPageChange} navigate={scrollNavigate} onSelectProduct={onSelectProduct} operation={operation} onScan={onScan} onProposeHeal={onProposeHeal} onApprove={onApprove} /></div>
+      <div id="market"><DashboardPage data={data} loading={loading} error={error} siteFilter={siteFilter} siteOptions={siteOptions} queryDraft={queryDraft} onQueryDraft={onQueryDraft} onSearch={onSearch} onSiteChange={onSiteChange} onRefresh={onRefresh} onPageChange={onPageChange} navigate={scrollNavigate} onSelectProduct={onSelectProduct} operation={operation} operatorUnlocked={operatorUnlocked} onOpenOperator={onOpenOperator} onScan={onScan} onProposeHeal={onProposeHeal} onApprove={onApprove} /></div>
       <div id="signals"><SignalsPage data={data} navigate={scrollNavigate} /></div>
       <div id="trust"><TrustPage data={data} navigate={scrollNavigate} /></div>
       <IntelligencePage insight={insight} loading={insightLoading} onRefresh={onInsightRefresh} />
@@ -1078,6 +1152,13 @@ function App() {
   const [insight, setInsight] = useState<MarketInsight | null>(null);
   const [insightLoading, setInsightLoading] = useState(false);
   const [operation, setOperation] = useState<Operation | null>(null);
+  const [operatorPanelOpen, setOperatorPanelOpen] = useState(false);
+  const [operatorKey, setOperatorKey] = useState("");
+  const [operatorUnlocked, setOperatorUnlocked] = useState(false);
+  const [operatorBusy, setOperatorBusy] = useState(false);
+  const [operatorError, setOperatorError] = useState<string | null>(null);
+
+  useEffect(() => () => api.lockOperations(), []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -1177,6 +1258,35 @@ function App() {
     }
   }, []);
 
+  const unlockOperator = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const candidate = operatorKey.trim();
+    if (!candidate) {
+      setOperatorError("Paste the Render operator key.");
+      return;
+    }
+    setOperatorBusy(true);
+    setOperatorError(null);
+    try {
+      await api.unlockOperations(candidate);
+      setOperatorUnlocked(true);
+      setOperatorKey("");
+      setOperatorPanelOpen(false);
+    } catch {
+      setOperatorError("That operator key was not accepted.");
+    } finally {
+      setOperatorBusy(false);
+    }
+  }, [operatorKey]);
+
+  const lockOperator = useCallback(() => {
+    api.lockOperations();
+    setOperatorUnlocked(false);
+    setOperatorKey("");
+    setOperatorError(null);
+    setOperatorPanelOpen(false);
+  }, []);
+
   const siteOptions = useMemo(
     () => data.collectors.map((collector) => collector.site_name).sort(),
     [data.collectors],
@@ -1227,6 +1337,8 @@ function App() {
         navigate={navigate}
         onSelectProduct={setSelectedProduct}
         operation={operation}
+        operatorUnlocked={operatorUnlocked}
+        onOpenOperator={() => setOperatorPanelOpen(true)}
         onScan={() => void startOperation(api.scan)}
         onProposeHeal={(incidentId) => void startOperation(() => api.proposeHeal(incidentId))}
         onApprove={(incidentId) => void startOperation(() => api.approveHeal(incidentId))}
@@ -1266,6 +1378,8 @@ function App() {
         navigate={navigate}
         onSelectProduct={setSelectedProduct}
         operation={operation}
+        operatorUnlocked={operatorUnlocked}
+        onOpenOperator={() => setOperatorPanelOpen(true)}
         onScan={() => void startOperation(api.scan)}
         onProposeHeal={(incidentId) => void startOperation(() => api.proposeHeal(incidentId))}
         onApprove={(incidentId) => void startOperation(() => api.approveHeal(incidentId))}
@@ -1326,16 +1440,29 @@ function App() {
           <span className="live-indicator">
             <i /> {error ? "signal paused" : "signal live"}
           </span>
-          {manualOperationsEnabled && <button
+          {(manualOperationsEnabled || operatorUnlocked) ? <button
             className="refresh-button"
             type="button"
             onClick={() => void startOperation(api.scan)}
             disabled={operation?.status === "queued" || operation?.status === "running"}
           >
             {operation?.status === "queued" || operation?.status === "running" ? "scan running…" : "run live scan"} <span>⌘</span>
-          </button>}
+          </button> : <button className="operator-mode-button" type="button" onClick={() => setOperatorPanelOpen(true)}>⌾ operator mode</button>}
+          {operatorUnlocked && !manualOperationsEnabled && <button className="operator-lock-button" type="button" onClick={lockOperator}>◉ operator on</button>}
         </div>
       </header>
+      <AnimatePresence>
+        {operatorPanelOpen && <OperatorConsole
+          unlocked={operatorUnlocked}
+          busy={operatorBusy}
+          error={operatorError}
+          keyValue={operatorKey}
+          onKeyChange={setOperatorKey}
+          onClose={() => { setOperatorPanelOpen(false); setOperatorError(null); }}
+          onUnlock={(event) => void unlockOperator(event)}
+          onLock={lockOperator}
+        />}
+      </AnimatePresence>
       <AnimatePresence mode="wait">
         <div key={route}>{page}</div>
       </AnimatePresence>

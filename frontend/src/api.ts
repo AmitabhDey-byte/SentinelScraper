@@ -10,10 +10,14 @@ import type {
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+let operatorToken = "";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, includeOperatorToken = false): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("X-SentinelScrape-Demo-User", "local-observer");
+  if (includeOperatorToken && operatorToken) {
+    headers.set("X-SentinelScrape-Operator", operatorToken);
+  }
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
@@ -23,6 +27,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 async function get<T>(path: string): Promise<T> {
   return request<T>(path);
+}
+
+async function operatorRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return request<T>(path, init, true);
 }
 
 export const api = {
@@ -48,11 +56,21 @@ export const api = {
   marketInsight: () => get<MarketInsight>("/insights/market"),
   latestOperation: () => get<Operation | null>("/operations/latest"),
   operation: (operationId: string) => get<Operation>(`/operations/${operationId}`),
-  scan: () => request<Operation>("/operations/scan", { method: "POST" }),
+  unlockOperations: async (token: string) => {
+    operatorToken = token;
+    try {
+      await operatorRequest<{ authorized: boolean }>("/operations/authorize", { method: "POST" });
+    } catch (error) {
+      operatorToken = "";
+      throw error;
+    }
+  },
+  lockOperations: () => { operatorToken = ""; },
+  scan: () => operatorRequest<Operation>("/operations/scan", { method: "POST" }),
   proposeHeal: (incidentId: number) =>
-    request<Operation>(`/operations/incidents/${incidentId}/heal`, { method: "POST" }),
+    operatorRequest<Operation>(`/operations/incidents/${incidentId}/heal`, { method: "POST" }),
   approveHeal: (incidentId: number) =>
-    request<Operation>(`/operations/incidents/${incidentId}/approve`, { method: "POST" }),
+    operatorRequest<Operation>(`/operations/incidents/${incidentId}/approve`, { method: "POST" }),
 };
 
 function buildQuery(

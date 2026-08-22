@@ -151,7 +151,7 @@ The header **Run live scan** and the in-page **Self-healing protocol** both crea
 1. **Propose AI heal** calls `bdata scraper heal` with the incident's actual dropped fields and saves the proposal for review.
 2. **Approve + verify** calls the Bright Data approval flow, re-runs the repaired collector, writes recovered fields and product observations, then asks Gemini for the guardrailed narration.
 
-For safety, these controls are available to the built-in local observer only in development. Production must set `APP_ENV=production` and protect requests with a server-side `OPERATIONS_API_TOKEN`; do not expose that token in the browser.
+For safety, these controls are available to the built-in local observer only in development. In production, **Operator mode** keeps the dashboard read-only until an operator pastes `OPERATIONS_API_TOKEN` into the console. The API validates it before enabling mutations; the token stays only in in-memory browser state for that tab, is never stored in Vercel or local storage, and can be locked again immediately.
 
 The collector-health rail above the panels is intentionally factual: each site is green only when its latest persisted run succeeded and it has no open incident. That gives the demo a compact “wall of checks” without inventing live data.
 
@@ -176,7 +176,7 @@ The repository includes a `Dockerfile` and a free-tier `render.yaml`. Render ser
 
 4. In GitHub Actions, add `DATABASE_URL`, `BRIGHTDATA_API_TOKEN`, and `GEMINI_API_KEY` as repository secrets. The `sentinel-self-heal` workflow is the production scheduler and writes its results to Neon.
 
-Production intentionally makes operation reads public but hides write controls. Visitors can inspect the latest automatic operation and its timestamped transcript, while GitHub Actions owns expensive Bright Data mutations. The hosted watchlist is stored in each visitor's browser, so it remains useful without exposing user data. `OPERATIONS_API_TOKEN` never goes into Vercel or browser code.
+Production intentionally makes operation reads public but hides write controls. Visitors can inspect the latest automatic operation and its timestamped transcript, while GitHub Actions owns expensive Bright Data mutations. An authorized operator can select **Operator mode** in the header, paste the Render-side `OPERATIONS_API_TOKEN`, then run a live scan or manually advance an incident through heal and approval. The hosted watchlist is stored in each visitor's browser, so it remains useful without exposing user data. Do not add `OPERATIONS_API_TOKEN` to Vercel: it is entered only by the operator at the moment it is needed.
 
 ## GitHub Actions: scrapers in CI
 

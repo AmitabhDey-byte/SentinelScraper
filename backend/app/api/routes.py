@@ -338,6 +338,13 @@ def scan_network(
     return _queue_operation(db=db, background_tasks=background_tasks, kind="scan", task="scan")
 
 
+@router.post("/operations/authorize")
+def authorize_operations(_: str = Depends(current_user_id)) -> dict[str, bool]:
+    """Validate an operator token without running a collector."""
+
+    return {"authorized": True}
+
+
 @router.post("/operations/incidents/{incident_id}/heal", response_model=OperationResponse, status_code=status.HTTP_202_ACCEPTED)
 def propose_heal(
     incident_id: int,
