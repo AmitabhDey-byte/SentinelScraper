@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "scroll-observatory": {
+      "targetKind": "new-ui",
+      "projectId": "13fb73dd-97fe-418b-a588-23dea2fdcdde",
+      "activeDraftId": "1dfab44a-71c7-48be-b4fb-302439bb44ea",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "frontend/src/styles.css:1:220",
+        "frontend/src/App.tsx:830:977",
+        "frontend/src/components/DashboardCards.tsx",
+        "frontend/src/components/Sparkline.tsx",
+        "frontend/src/api.ts",
+        "frontend/src/types.ts"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "8214d771ea2635ed5eebe2de47a4b5867e90da063ef38b029f590cac03811360",
+        "frontend/src/styles.css": "7233a32709e586102cf9086930b35b3c19b628d6b01efba535b4d8e9bd8559f3",
+        "frontend/src/App.tsx": "cefe24c6f3d1072d4e719b1433d044c276e95fe5e87285828bb5c7460698abae",
+        "frontend/src/components/DashboardCards.tsx": "e62ff313baf79c77cc8114649240409e5d96aea8182ec556f9d206228adc66db",
+        "frontend/src/components/Sparkline.tsx": "8855edaaa31d25c1db8e7c1e4256aac2601675f58107288d29735e4b98840c58",
+        "frontend/src/api.ts": "00a0ae9ab0d297b109fb3097c84dd402c79bf776edc3259b45c6b208404d42b7",
+        "frontend/src/types.ts": "0bfea3ad3de9ada8c0a84d43e49346945b3c72ccb41d28e0b20058211e728cbf"
+      },
+      "components": [
+        {
+          "name": "TopBar",
+          "id": "27c36bf9-d381-4ef7-958a-be643701b02d",
+          "sourcePath": "frontend/src/App.tsx"
+        }
+      ],
+      "drafts": {
+        "1dfab44a-71c7-48be-b4fb-302439bb44ea": {
+          "title": "SentinelScrape scroll observatory",
+          "visualDirection": "old-world intelligence observatory with a dark Zeus field and a separate luminous intelligence chapter",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-08-22T16:28:49.683Z"
+    }
+  }
+}

@@ -50,16 +50,17 @@ export function StockPill({ value }: { value: string | null }) {
 export function ProductRow({
   product,
   index = 0,
+  onSelect,
 }: {
   product: Product;
   index?: number;
+  onSelect?: (product: Product) => void;
 }) {
   return (
-    <motion.a
+    <motion.button
+      type="button"
       className="market-row"
-      href={product.listing_url || "#"}
-      target="_blank"
-      rel="noreferrer"
+      onClick={() => onSelect?.(product)}
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: Math.min(index, 7) * 0.035, duration: 0.24 }}
@@ -83,14 +84,14 @@ export function ProductRow({
       <span className="price-cell">{formatPrice(product.price)}</span>
       <StockPill value={product.stock_status} />
       <Sparkline values={product.price_history.map((point) => point.price)} />
-    </motion.a>
+    </motion.button>
   );
 }
 
 export function AlertCard({ alert }: { alert: Alert }) {
   const isDrop = alert.type === "price_drop";
   const detail = isDrop
-    ? `${formatPrice(alert.previous_value)} → ${formatPrice(alert.current_value)}`
+    ? `${formatPrice(alert.previous_value)} · ${formatPrice(alert.current_value)}`
     : alert.stock_status;
 
   return (
@@ -99,7 +100,7 @@ export function AlertCard({ alert }: { alert: Alert }) {
       whileHover={{ x: 4 }}
     >
       <div className="alert-icon" aria-hidden="true">
-        {isDrop ? "↓" : "↗"}
+        {isDrop ? "↓" : "✦"}
       </div>
       <div className="alert-copy">
         <div className="alert-topline">
@@ -149,7 +150,7 @@ export function TrustCard({ incident }: { incident: Incident }) {
       </div>
       <div className="trust-footer">
         <span>
-          {incident.rows_prev} rows → {incident.rows_curr} rows
+          {incident.rows_prev} rows · {incident.rows_curr} rows
         </span>
         <span className={`source-badge source-${source}`}>
           {incident.narration_source ?? "awaiting narration"}

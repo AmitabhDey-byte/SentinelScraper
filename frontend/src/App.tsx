@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import { api } from "./api";
+import { PixelSwap } from "./components/PixelSwap";
+import { ProductGlance } from "./components/ProductGlance";
 import {
   AlertCard,
   CollectorRail,
@@ -19,7 +21,11 @@ import type {
   AlertPage,
   CollectorStatus,
   IncidentPage,
+  MarketInsight,
+  Operation,
+  Product,
   ProductPage,
+  Profile,
 } from "./types";
 import "./styles.css";
 
@@ -118,24 +124,24 @@ function EmptyState({
   );
 }
 
-function NavLink({
-  href,
+function ScrollNavLink({
+  section,
   label,
   active,
-  onNavigate,
+  onJump,
 }: {
-  href: Route;
+  section: string;
   label: string;
   active: boolean;
-  onNavigate: (route: Route) => void;
+  onJump: (section: string) => void;
 }) {
   return (
     <a
-      href={href}
+      href={`#${section}`}
       className={`nav-link ${active ? "nav-link-active" : ""}`}
       onClick={(event) => {
         event.preventDefault();
-        onNavigate(href);
+        onJump(section);
       }}
     >
       {label}
@@ -171,7 +177,7 @@ function Pagination({
           disabled={page === 1}
           aria-label="Previous page"
         >
-          ←
+          ‹
         </button>
         {visiblePages.map((pageNumber) => (
           <button
@@ -189,7 +195,7 @@ function Pagination({
           disabled={page === totalPages}
           aria-label="Next page"
         >
-          →
+          ›
         </button>
       </div>
     </div>
@@ -254,7 +260,7 @@ function SignalSummary({
         <small>price drops</small>
       </div>
       <div className="signal-summary-card signal-summary-restock">
-        <span>↗</span>
+        <span>✦</span>
         <strong>{restocks}</strong>
         <small>back in stock</small>
       </div>
@@ -264,6 +270,70 @@ function SignalSummary({
         <small>open breaks</small>
       </div>
     </div>
+  );
+}
+
+function HealingConsole({
+  operation,
+  incidents,
+  onScan,
+  onProposeHeal,
+  onApprove,
+}: {
+  operation: Operation | null;
+  incidents: IncidentPage;
+  onScan: () => void;
+  onProposeHeal: (incidentId: number) => void;
+  onApprove: (incidentId: number) => void;
+}) {
+  const busy = operation?.status === "queued" || operation?.status === "running";
+  const openIncident = incidents.items.find((incident) => incident.status === "open");
+  const stage = operation?.kind === "approve_and_verify" ? "approve + verify" : operation?.kind === "heal_proposal" ? "heal proposal" : operation?.kind === "scan" ? "scan network" : "ready";
+  return (
+    <section className="healing-console" aria-label="Self-healing operation console">
+      <div className="healing-console-title">
+        <p className="eyebrow">LIVE / SELF-HEALING PROTOCOL</p>
+        <h2>Make the break prove itself.</h2>
+        <p>Every command below calls your Bright Data collectors. The record is persisted and Gemini narrates a verified recovery.</p>
+      </div>
+      <div className="healing-steps" aria-label="Healing workflow stages">
+        <span className={operation?.kind === "scan" ? "active" : ""}>01 Scan</span>
+        <span className={operation?.kind === "heal_proposal" ? "active" : ""}>02 Detect</span>
+        <span className={operation?.kind === "approve_and_verify" ? "active" : ""}>03 Heal</span>
+        <span className={operation?.status === "completed" ? "active" : ""}>04 Prove</span>
+      </div>
+      <div className="healing-actions">
+        <button type="button" className="operation-primary" onClick={onScan} disabled={busy}>
+          {busy && operation?.kind === "scan" ? "Scanning collectors…" : "Run Bright Data scan"}
+        </button>
+        {openIncident && (
+          <>
+            <button type="button" onClick={() => onProposeHeal(openIncident.id)} disabled={busy}>
+              Propose AI heal
+            </button>
+            <button type="button" onClick={() => onApprove(openIncident.id)} disabled={busy}>
+              Approve + verify
+            </button>
+          </>
+        )}
+      </div>
+      <div className="operation-transcript">
+        <div>
+          <span>OPERATION</span>
+          <strong>{stage}</strong>
+        </div>
+        <div>
+          <span>STATUS</span>
+          <strong className={`operation-${operation?.status ?? "ready"}`}>{operation?.status?.replace(/_/g, " ") ?? "waiting for command"}</strong>
+        </div>
+        <ol>
+          {(operation?.events ?? [{ at: new Date().toISOString(), message: "Run a scan to create a live, inspectable Bright Data operation." }]).slice(-3).map((event) => (
+            <li key={`${event.at}-${event.message}`}><time>{new Date(event.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>{event.message}</li>
+          ))}
+        </ol>
+      </div>
+      {operation?.error && <p className="operation-error">{operation.error}</p>}
+    </section>
   );
 }
 
@@ -280,6 +350,11 @@ function DashboardPage({
   onRefresh,
   onPageChange,
   navigate,
+  onSelectProduct,
+  operation,
+  onScan,
+  onProposeHeal,
+  onApprove,
 }: {
   data: DashboardState;
   loading: boolean;
@@ -293,6 +368,11 @@ function DashboardPage({
   onRefresh: () => void;
   onPageChange: (page: number) => void;
   navigate: (route: Route) => void;
+  onSelectProduct: (product: Product) => void;
+  operation: Operation | null;
+  onScan: () => void;
+  onProposeHeal: (incidentId: number) => void;
+  onApprove: (incidentId: number) => void;
 }) {
   const healedCount = data.incidents.items.filter(
     (incident) => incident.status === "healed",
@@ -343,6 +423,7 @@ function DashboardPage({
       </section>
       <StatStrip data={data} />
       <CollectorRail collectors={data.collectors} />
+      <HealingConsole operation={operation} incidents={data.incidents} onScan={onScan} onProposeHeal={onProposeHeal} onApprove={onApprove} />
       {error && (
         <div className="error-banner" role="alert">
           <span>Signal lost</span>
@@ -402,7 +483,7 @@ function DashboardPage({
               </div>
             ) : data.products.items.length ? (
               data.products.items.map((product, index) => (
-                <ProductRow product={product} key={product.id} index={index} />
+                <ProductRow product={product} key={product.id} index={index} onSelect={onSelectProduct} />
               ))
             ) : (
               <EmptyState detail="Run one collector cycle.">
@@ -428,7 +509,7 @@ function DashboardPage({
                   type="button"
                   onClick={() => navigate("/signals")}
                 >
-                  open log →
+                  open log ⧉
                 </button>
               }
             />
@@ -461,7 +542,7 @@ function DashboardPage({
                   type="button"
                   onClick={() => navigate("/trust")}
                 >
-                  full trace →
+                  full trace ⧉
                 </button>
               }
             />
@@ -515,7 +596,7 @@ function LandingPage({
               type="button"
               onClick={() => navigate("/dashboard")}
             >
-              Enter the control room <span>↗</span>
+              Enter the control room <span>⌘</span>
             </button>
             <button
               className="text-button"
@@ -535,11 +616,11 @@ function LandingPage({
         <span>THE LOOP</span>
         <div>
           <b>WATCH</b>
-          <i>→</i>
+          <i>✦</i>
           <b>DETECT</b>
-          <i>→</i>
+          <i>✦</i>
           <b>HEAL</b>
-          <i>→</i>
+          <i>✦</i>
           <b>PROVE</b>
         </div>
         <span>04 / 04</span>
@@ -555,7 +636,7 @@ function LandingPage({
             {data.products.total || "—"} listings in the latest indexed view.
           </p>
           <button type="button" onClick={() => navigate("/dashboard")}>
-            open the ledger →
+            open the ledger ⧉
           </button>
         </motion.article>
         <motion.article
@@ -568,7 +649,7 @@ function LandingPage({
             {data.alerts.total} price and stock changes waiting for a decision.
           </p>
           <button type="button" onClick={() => navigate("/signals")}>
-            read the notices →
+            read the notices ⧉
           </button>
         </motion.article>
         <motion.article
@@ -579,7 +660,7 @@ function LandingPage({
           <h2>Repair register</h2>
           <p>{healthy} collectors clear. Every recovery stays visible.</p>
           <button type="button" onClick={() => navigate("/trust")}>
-            inspect the register →
+            inspect the register ⧉
           </button>
         </motion.article>
       </section>
@@ -611,7 +692,7 @@ function SignalsPage({
             type="button"
             onClick={() => navigate("/dashboard")}
           >
-            ← back to market
+            return to market
           </button>
         }
       />
@@ -674,7 +755,7 @@ function TrustPage({
             type="button"
             onClick={() => navigate("/dashboard")}
           >
-            ← back to market
+            return to market
           </button>
         }
       />
@@ -684,13 +765,13 @@ function TrustPage({
           <strong>FIELD DROP</strong>
           <small>completeness falls below 20%</small>
         </div>
-        <i>→</i>
+        <i>✦</i>
         <div>
           <span>02</span>
           <strong>AI HEAL</strong>
           <small>Bright Data proposes a repair</small>
         </div>
-        <i>→</i>
+        <i>✦</i>
         <div>
           <span>03</span>
           <strong>PROOF</strong>
@@ -740,7 +821,7 @@ function NetworkPage({
             type="button"
             onClick={() => navigate("/dashboard")}
           >
-            ← back to market
+            return to market
           </button>
         }
       />
@@ -772,7 +853,7 @@ function NetworkPage({
                 </span>
               </div>
               <button type="button" onClick={() => navigate("/dashboard")}>
-                open market →
+                open market ⧉
               </button>
             </motion.article>
           ))
@@ -809,6 +890,167 @@ function PageIntro({
   );
 }
 
+function IntelligencePage({
+  insight,
+  loading,
+  onRefresh,
+}: {
+  insight: MarketInsight | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <section className="intelligence-section" id="intelligence">
+      <div className="intelligence-veil" />
+      <div className="intelligence-copy">
+        <p className="eyebrow">05 / THE CABINET OF REASON</p>
+        <h1>
+          Evidence first.
+          <br />
+          <em>Judgment second.</em>
+        </h1>
+        <p>
+          Gemini turns only the latest verified movement and collector state into a brief. It does not fabricate a price forecast.
+        </p>
+      </div>
+      <div className="intelligence-card">
+        <PixelSwap
+          firstContent={
+            <div>
+              <span className="pixel-kicker">MARKET BRIEF / TAP TO UNSEAL</span>
+              <strong>{loading ? "Consulting the record…" : "A grounded note is waiting."}</strong>
+              <small>Gemini speaks after the ledger is checked.</small>
+            </div>
+          }
+          secondContent={
+            <div>
+              <span className="pixel-kicker">{insight?.source ?? "fallback"} / {insight?.confidence ?? "medium"} confidence</span>
+              <strong>{insight?.headline ?? "The latest record is still being assembled."}</strong>
+              <small>{insight?.recommendation ?? "Run a fresh scan to create an evidence-backed brief."}</small>
+            </div>
+          }
+        />
+        <button className="intelligence-refresh" type="button" onClick={onRefresh} disabled={loading}>
+          {loading ? "Reading…" : "Refresh brief ⌘"}
+        </button>
+        {insight && <p className="intelligence-rationale">{insight.rationale}</p>}
+      </div>
+    </section>
+  );
+}
+
+function ProfilePage({
+  profile,
+  identity,
+  favorites,
+  onSelectProduct,
+  onJump,
+}: {
+  profile: Profile | null;
+  identity: { label: string; authenticated: boolean };
+  favorites: Product[];
+  onSelectProduct: (product: Product) => void;
+  onJump: (section: string) => void;
+}) {
+  return (
+    <section className="profile-section" id="profile">
+      <div className="profile-sheet">
+        <p className="eyebrow">06 / YOUR WATCHLIST</p>
+        <h2>{identity.authenticated ? `${identity.label}'s cabinet` : "The local observer's cabinet"}</h2>
+        <p>
+          {identity.authenticated
+            ? "Your saved listings are attached to this protected operator session."
+            : "Local mode is ready for a demo. Saved listings stay in this SentinelScrape database."}
+        </p>
+        <div className="profile-stats">
+          <span><b>{profile?.favorites_count ?? favorites.length}</b> saved</span>
+          <span><b>{profile?.auth_mode === "operator" ? "operator" : "local"}</b> identity</span>
+        </div>
+        <button className="text-button" type="button" onClick={() => onJump("market")}>Browse the ledger</button>
+      </div>
+      <div className="favorites-shelf">
+        <p className="eyebrow">FAVOURITES / AT A GLANCE</p>
+        {favorites.length ? (
+          favorites.slice(0, 4).map((product) => (
+            <button type="button" className="favorite-card" key={product.id} onClick={() => onSelectProduct(product)}>
+              <span>{product.site_name}</span>
+              <strong>{product.name}</strong>
+              <small>{product.price === null ? "Price pending" : `$${Math.round(product.price)}`}</small>
+            </button>
+          ))
+        ) : (
+          <div className="favorites-empty">Save a listing from the ledger and it will appear here.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ScrollObservatory({
+  data,
+  loading,
+  error,
+  siteFilter,
+  siteOptions,
+  queryDraft,
+  onQueryDraft,
+  onSearch,
+  onSiteChange,
+  onRefresh,
+  onPageChange,
+  navigate,
+  onSelectProduct,
+  insight,
+  insightLoading,
+  onInsightRefresh,
+  profile,
+  identity,
+  favorites,
+  onJump,
+  operation,
+  onScan,
+  onProposeHeal,
+  onApprove,
+}: {
+  data: DashboardState;
+  loading: boolean;
+  error: string | null;
+  siteFilter: string;
+  siteOptions: string[];
+  queryDraft: string;
+  onQueryDraft: (value: string) => void;
+  onSearch: (event: FormEvent<HTMLFormElement>) => void;
+  onSiteChange: (value: string) => void;
+  onRefresh: () => void;
+  onPageChange: (page: number) => void;
+  navigate: (route: Route) => void;
+  onSelectProduct: (product: Product) => void;
+  insight: MarketInsight | null;
+  insightLoading: boolean;
+  onInsightRefresh: () => void;
+  profile: Profile | null;
+  identity: { label: string; authenticated: boolean };
+  favorites: Product[];
+  onJump: (section: string) => void;
+  operation: Operation | null;
+  onScan: () => void;
+  onProposeHeal: (incidentId: number) => void;
+  onApprove: (incidentId: number) => void;
+}) {
+  const scrollNavigate = (route: Route) => onJump(route === "/signals" ? "signals" : route === "/trust" ? "trust" : route === "/network" ? "network" : "market");
+  return (
+    <div className="scroll-observatory">
+      <div id="overview"><LandingPage data={data} navigate={scrollNavigate} /></div>
+      <div id="market"><DashboardPage data={data} loading={loading} error={error} siteFilter={siteFilter} siteOptions={siteOptions} queryDraft={queryDraft} onQueryDraft={onQueryDraft} onSearch={onSearch} onSiteChange={onSiteChange} onRefresh={onRefresh} onPageChange={onPageChange} navigate={scrollNavigate} onSelectProduct={onSelectProduct} operation={operation} onScan={onScan} onProposeHeal={onProposeHeal} onApprove={onApprove} /></div>
+      <div id="signals"><SignalsPage data={data} navigate={scrollNavigate} /></div>
+      <div id="trust"><TrustPage data={data} navigate={scrollNavigate} /></div>
+      <IntelligencePage insight={insight} loading={insightLoading} onRefresh={onInsightRefresh} />
+      <div id="network"><NetworkPage data={data} navigate={scrollNavigate} /></div>
+      <ProfilePage profile={profile} identity={identity} favorites={favorites} onSelectProduct={onSelectProduct} onJump={onJump} />
+    </div>
+  );
+}
+
 function Footer({ lastUpdated }: { lastUpdated: Date | null }) {
   return (
     <footer className="footer">
@@ -818,13 +1060,19 @@ function Footer({ lastUpdated }: { lastUpdated: Date | null }) {
       <span>
         {lastUpdated
           ? `last synced ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-          : "Bright Data / Gemini / SQLite"}
+          : "Bright Data / Gemini / local store"}
       </span>
     </footer>
   );
 }
 
-function App() {
+function App({
+  identity = { label: "Local observer", authenticated: false },
+  accountControl,
+}: {
+  identity?: { label: string; authenticated: boolean };
+  accountControl?: ReactNode;
+}) {
   const { route, navigate } = useRoute();
   const [data, setData] = useState<DashboardState>(emptyState);
   const [loading, setLoading] = useState(true);
@@ -834,6 +1082,12 @@ function App() {
   const [siteFilter, setSiteFilter] = useState("");
   const [query, setQuery] = useState("");
   const [queryDraft, setQueryDraft] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [favorites, setFavorites] = useState<Product[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [insight, setInsight] = useState<MarketInsight | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [operation, setOperation] = useState<Operation | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -867,13 +1121,115 @@ function App() {
     void refresh();
   }, [refresh]);
 
+  const refreshPersonal = useCallback(async () => {
+    try {
+      const [nextProfile, nextFavorites] = await Promise.all([api.profile(), api.favorites()]);
+      setProfile(nextProfile);
+      setFavorites(nextFavorites);
+    } catch {
+      // The market still works before a local migration has been applied.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshPersonal();
+  }, [refreshPersonal, identity.authenticated]);
+
+  const refreshInsight = useCallback(async () => {
+    setInsightLoading(true);
+    try {
+      setInsight(await api.marketInsight());
+    } catch {
+      setInsight(null);
+    } finally {
+      setInsightLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshInsight();
+  }, [refreshInsight]);
+
+  useEffect(() => {
+    void api.latestOperation().then(setOperation).catch(() => setOperation(null));
+  }, []);
+
+  useEffect(() => {
+    if (!operation || !["queued", "running"].includes(operation.status)) return;
+    const timer = window.setInterval(() => {
+      void api.operation(operation.id).then((nextOperation) => {
+        setOperation(nextOperation);
+        if (!["queued", "running"].includes(nextOperation.status)) {
+          void refresh();
+          void refreshInsight();
+        }
+      }).catch(() => undefined);
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [operation, refresh, refreshInsight]);
+
+  const startOperation = useCallback(async (request: () => Promise<Operation>) => {
+    try {
+      setOperation(await request());
+      setError(null);
+    } catch (operationError) {
+      setError(operationError instanceof Error ? operationError.message : "Operation could not be started");
+    }
+  }, []);
+
   const siteOptions = useMemo(
     () => data.collectors.map((collector) => collector.site_name).sort(),
     [data.collectors],
   );
+  const favoriteIds = useMemo(() => new Set(favorites.map((product) => product.id)), [favorites]);
+  const toggleFavorite = useCallback(async (product: Product) => {
+    const wasFavorite = favoriteIds.has(product.id);
+    try {
+      await (wasFavorite ? api.removeFavorite(product.id) : api.saveFavorite(product.id));
+      await refreshPersonal();
+    } catch {
+      // A failed save is non-destructive; the current displayed list remains truthful.
+    }
+  }, [favoriteIds, refreshPersonal]);
+
+  const jumpTo = useCallback((section: string) => {
+    const scroll = () => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (route !== "/") {
+      navigate("/");
+      window.setTimeout(scroll, 80);
+      return;
+    }
+    scroll();
+  }, [navigate, route]);
+
   const page =
     route === "/" ? (
-      <LandingPage data={data} navigate={navigate} />
+      <ScrollObservatory
+        data={data}
+        loading={loading}
+        error={error}
+        siteFilter={siteFilter}
+        siteOptions={siteOptions}
+        queryDraft={queryDraft}
+        onQueryDraft={setQueryDraft}
+        onSearch={(event) => { event.preventDefault(); setProductPageNumber(1); setQuery(queryDraft.trim()); }}
+        onSiteChange={(value) => { setSiteFilter(value); setProductPageNumber(1); }}
+        onRefresh={() => void refresh()}
+        onPageChange={setProductPageNumber}
+        navigate={navigate}
+        onSelectProduct={setSelectedProduct}
+        operation={operation}
+        onScan={() => void startOperation(api.scan)}
+        onProposeHeal={(incidentId) => void startOperation(() => api.proposeHeal(incidentId))}
+        onApprove={(incidentId) => void startOperation(() => api.approveHeal(incidentId))}
+        insight={insight}
+        insightLoading={insightLoading}
+        onInsightRefresh={() => void refreshInsight()}
+        profile={profile}
+        identity={identity}
+        favorites={favorites}
+        onJump={jumpTo}
+      />
     ) : route === "/signals" ? (
       <SignalsPage data={data} navigate={navigate} />
     ) : route === "/trust" ? (
@@ -901,6 +1257,11 @@ function App() {
         onRefresh={() => void refresh()}
         onPageChange={setProductPageNumber}
         navigate={navigate}
+        onSelectProduct={setSelectedProduct}
+        operation={operation}
+        onScan={() => void startOperation(api.scan)}
+        onProposeHeal={(incidentId) => void startOperation(() => api.proposeHeal(incidentId))}
+        onApprove={(incidentId) => void startOperation(() => api.approveHeal(incidentId))}
       />
     );
 
@@ -923,29 +1284,35 @@ function App() {
           </span>
         </a>
         <nav className="nav-links" aria-label="Primary navigation">
-          <NavLink
-            href="/dashboard"
+          <ScrollNavLink
+            section="market"
             label="Control room"
             active={route === "/dashboard"}
-            onNavigate={navigate}
+            onJump={jumpTo}
           />
-          <NavLink
-            href="/signals"
+          <ScrollNavLink
+            section="signals"
             label="Signals"
             active={route === "/signals"}
-            onNavigate={navigate}
+            onJump={jumpTo}
           />
-          <NavLink
-            href="/trust"
+          <ScrollNavLink
+            section="trust"
             label="Trust layer"
             active={route === "/trust"}
-            onNavigate={navigate}
+            onJump={jumpTo}
           />
-          <NavLink
-            href="/network"
+          <ScrollNavLink
+            section="intelligence"
+            label="Intelligence"
+            active={false}
+            onJump={jumpTo}
+          />
+          <ScrollNavLink
+            section="network"
             label="Network"
             active={route === "/network"}
-            onNavigate={navigate}
+            onJump={jumpTo}
           />
         </nav>
         <div className="topbar-right">
@@ -955,11 +1322,12 @@ function App() {
           <button
             className="refresh-button"
             type="button"
-            onClick={() => void refresh()}
-            disabled={loading}
+            onClick={() => void startOperation(api.scan)}
+            disabled={operation?.status === "queued" || operation?.status === "running"}
           >
-            {loading ? "scanning…" : "scan again"} <span>↗</span>
+            {operation?.status === "queued" || operation?.status === "running" ? "scan running…" : "run live scan"} <span>⌘</span>
           </button>
+          {accountControl}
         </div>
       </header>
       <AnimatePresence mode="wait">
@@ -970,6 +1338,12 @@ function App() {
           <Footer lastUpdated={lastUpdated} />
         </div>
       )}
+      <ProductGlance
+        product={selectedProduct}
+        favorite={selectedProduct ? favoriteIds.has(selectedProduct.id) : false}
+        onClose={() => setSelectedProduct(null)}
+        onFavorite={(product) => void toggleFavorite(product)}
+      />
     </div>
   );
 }

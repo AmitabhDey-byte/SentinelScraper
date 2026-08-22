@@ -123,3 +123,33 @@ class RagQueryRequest(BaseModel):
 class RagQueryResponse(BaseModel):
     answer: str
     citations: list[Citation]
+
+
+class MarketInsightResponse(BaseModel):
+    headline: str
+    recommendation: str
+    rationale: str
+    confidence: str
+    source: str
+
+
+class ProfileResponse(BaseModel):
+    user_id: str
+    favorites_count: int
+    auth_mode: str
+
+
+class OperationEventResponse(BaseModel):
+    at: datetime
+    message: str
+
+
+class OperationResponse(BaseModel):
+    id: str
+    kind: str
+    status: str
+    incident_id: int | None
+    started_at: datetime
+    completed_at: datetime | None
+    events: list[OperationEventResponse]
+    error: str | None

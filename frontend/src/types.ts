@@ -66,3 +66,33 @@ export type Page<T> = {
 export type ProductPage = Page<Product>;
 export type AlertPage = Page<Alert>;
 export type IncidentPage = Page<Incident>;
+
+export type Profile = {
+  user_id: string;
+  favorites_count: number;
+  auth_mode: "operator" | "local-demo";
+};
+
+export type MarketInsight = {
+  headline: string;
+  recommendation: string;
+  rationale: string;
+  confidence: "low" | "medium" | "high";
+  source: "gemini" | "fallback";
+};
+
+export type OperationEvent = {
+  at: string;
+  message: string;
+};
+
+export type Operation = {
+  id: string;
+  kind: "scan" | "heal_proposal" | "approve_and_verify";
+  status: "queued" | "running" | "completed" | "completed_with_errors" | "failed";
+  incident_id: number | null;
+  started_at: string;
+  completed_at: string | null;
+  events: OperationEvent[];
+  error: string | null;
+};

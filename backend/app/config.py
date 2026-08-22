@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     competitor_sources_json: str = "[]"
     slack_webhook_url: str = ""
     discord_webhook_url: str = ""
+    app_env: str = "development"
+    operations_api_token: str = ""
 
     model_config = SettingsConfigDict(env_file=str(REPO_ROOT / ".env"), extra="ignore")
 

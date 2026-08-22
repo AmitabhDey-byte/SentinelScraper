@@ -29,6 +29,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           npm install --global @brightdata/cli
+      - name: Restore prior observation baseline
+        uses: actions/cache@v4
+        with:
+          path: backend/output/competitive-intel/
+          key: competitive-intel-${{ github.run_id }}
+          restore-keys: competitive-intel-
       - run: python scripts/competitive_intel.py
       - uses: actions/upload-artifact@v4
         with:

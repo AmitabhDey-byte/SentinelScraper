@@ -20,7 +20,7 @@ The demo is a visible reliability loop:
 
 1. **Site changes.** A listing page changes markup, causing one or more collector fields to become empty.
 2. **Detection.** The scheduler runs every collector and compares the new snapshot with the last successful snapshot. A field is marked dropped only when completeness moves from strictly above 80% to strictly below 20%.
-3. **Trust Layer incident.** The failed run, row counts, dropped fields, and collector are written to SQLite. The incident appears as open in the `/incidents` API and the dashboard feed.
+3. **Trust Layer incident.** The failed run, row counts, dropped fields, and collector are written to the configured database. The incident appears as open in the `/incidents` API and the dashboard feed.
 4. **Heal / approve.** An operator runs the Bright Data AI healing command. The proposed output can be inspected first. `bdata scraper approve` is only called with the explicit `--approve` flag, preserving the human-in-the-loop default.
 5. **Recovery.** The healed snapshot is compared to the broken snapshot. Approval is recorded only when at least one dropped field recovers above 80% completeness.
 6. **Narration.** Gemini `gemini-2.5-flash-lite` receives a structured JSON schema. Its site, fields, and current row count are validated against the real diff before trust. Any mismatch, malformed response, missing key, or API failure becomes a deterministic report with `narration_source: "fallback"`.
@@ -33,7 +33,7 @@ backend/
   app/db/              SQLAlchemy models, session, and metadata
   app/orchestration/   bdata adapter, polling loop, healing workflow
   app/services/        diffing, narration, RAG, search, and intel services
-  alembic/              initial database migration
+  alembic/              database migrations
   tests/                fake snapshot and narration tests
 frontend/              React/Vite dashboard
 scripts/                collector bootstrap, scheduler, RAG, search, and battle helpers
@@ -70,8 +70,14 @@ BRIGHTDATA_API_TOKEN=your_bright_data_token
 BRIGHTDATA_API_KEY=your_bright_data_token
 GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-2.5-flash-lite
+# Local demo
 DATABASE_URL=sqlite:///./backend/sentinelscrape.db
+# Production / Neon
+# DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST/DB?sslmode=require
+OPERATIONS_API_TOKEN=
 ```
+
+For the dashboard, copy `frontend/.env.example` to `frontend/.env.local`. It runs as a local observer by default. In production, protect `OPERATIONS_API_TOKEN` at a server-side gateway before exposing collector mutation controls.
 
 Authenticate the `bdata` CLI according to your Bright Data account setup. The application never stores the API token in the database.
 
@@ -83,7 +89,7 @@ Run from the repository root:
 python -m alembic -c backend/alembic.ini upgrade head
 ```
 
-The migration creates `collectors`, `runs`, `products`, `price_history`, and `incidents`.
+The migrations create `collectors`, `runs`, `products`, `price_history`, `incidents`, and per-user `favorites`.
 
 ### 4. Create the five Scraper Studio collectors
 
@@ -123,12 +129,14 @@ cd frontend
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. The frontend now has four focused views:
+Open `http://127.0.0.1:5173`. It is now one responsive, scroll-driven observatory rather than a static dashboard:
 
 - **Landing:** the self-healing loop as the product story.
 - **Control room:** paginated market listings with search, market filters, price sparklines, signals, and the Trust Layer.
 - **Signals:** a larger impact desk for filtering price drops and restocks.
 - **Trust layer / Network:** the full incident trace and per-collector health views.
+- **Intelligence:** a Gemini brief that is explicitly grounded in verified price/restock counts and open incidents, plus the existing Search and Docs-RAG APIs for deeper research.
+- **Your watchlist:** local saved favorites. Selecting a product opens a quick-glance sheet with price trace, save, share, and retailer controls.
 
 The control room has three core panels:
 
@@ -136,11 +144,20 @@ The control room has three core panels:
 - **Alerts:** latest price drops and restocks derived from adjacent observations.
 - **Trust Layer:** reverse-chronological incidents with broken fields, recovered fields, row counts, narration, and Gemini/fallback provenance.
 
+### Run the self-healing loop from the UI
+
+The header **Run live scan** and the in-page **Self-healing protocol** both create a persisted Bright Data operation—this is not a browser refresh. The UI polls its transcript while each collector runs. When the detector finds a completeness collapse, it exposes two deliberate controls:
+
+1. **Propose AI heal** calls `bdata scraper heal` with the incident's actual dropped fields and saves the proposal for review.
+2. **Approve + verify** calls the Bright Data approval flow, re-runs the repaired collector, writes recovered fields and product observations, then asks Gemini for the guardrailed narration.
+
+For safety, these controls are available to the built-in local observer only in development. Production must set `APP_ENV=production` and protect requests with a server-side `OPERATIONS_API_TOKEN`; do not expose that token in the browser.
+
 The collector-health rail above the panels is intentionally factual: each site is green only when its latest persisted run succeeded and it has no open incident. That gives the demo a compact “wall of checks” without inventing live data.
 
 ## GitHub Actions: scrapers in CI
 
-`.github/workflows/sentinel-self-heal.yml` runs every 30 minutes and can also be started manually. Add `BRIGHTDATA_API_TOKEN` and `GEMINI_API_KEY` as repository secrets, then enable the workflow. Each run:
+`.github/workflows/sentinel-self-heal.yml` runs every 30 minutes and can also be started manually. Add `BRIGHTDATA_API_TOKEN`, `GEMINI_API_KEY`, and Neon `DATABASE_URL` as repository secrets, then enable the workflow. Each run:
 
 1. creates or reuses the five collectors;
 2. runs the snapshots and checks completeness drift;
@@ -158,7 +175,7 @@ The project now covers the relevant functionality from resources 04–09:
 - **04 — Self-healing scraper:** `scripts/demo_self_heal.py` creates a deterministic field break/recovery proof; the live path uses the detected incident description with `bdata scraper heal`, verifies recovery, approves, and re-runs.
 - **05 — Scrapers in CI:** `.github/workflows/sentinel-self-heal.yml` runs the complete loop on a cron and leaves a summary plus collector JSON artifacts.
 - **06 — Docs to RAG:** `scripts/build_docs_rag.py` uses Bright Data to fetch a sitemap and pages, chunks them, embeds them with `gemini-embedding-001` when configured, and stores a cited index. `scripts/query_docs.py` and `POST /rag/query` answer with source URLs.
-- **07 — Competitive intel:** `scripts/competitive_intel.py` diffs three to five configured competitor pages weekly and can deliver a short update to Slack or Discord. `.github/workflows/competitive-intel.yml` schedules it every Monday.
+- **07 — Competitive intel:** `scripts/competitive_intel.py` diffs three to five configured competitor pages weekly and can deliver a short update to Slack or Discord. The Monday workflow restores the prior observation baseline from Actions cache before creating the next diff.
 - **08 — Keyword-powered agent:** `scripts/keyword_agent.py` and `POST /research` use Bright Data Search with a plain-English keyword, optional country, and search type.
 - **09 — Parallel scraper battle:** `scripts/parallel_scraper_battle.py` fans out independent site agents concurrently, scores extraction coverage, and writes a deterministic judge result to `battle.json`.
 
@@ -192,8 +209,14 @@ The second command runs `bdata scraper heal`, verifies the recovered fields, cal
 - `GET /products?site=eBay&page=1&page_size=8&q=laptop`
 - `GET /incidents?page=1&page_size=50`
 - `GET /alerts?page=1&page_size=50`
+- `GET /me/profile`, `GET /me/favorites`, `PUT|DELETE /me/favorites/{product_id}`
+- `GET /insights/market`
+- `POST /operations/scan` — authenticated/local-dev live Bright Data collector run
+- `POST /operations/incidents/{id}/heal` — create a Bright Data AI heal proposal
+- `POST /operations/incidents/{id}/approve` — approve, re-run, verify, and narrate
+- `GET /operations/latest`, `GET /operations/{id}` — persisted operational transcript
 
-The paginated endpoints return `{items, page, page_size, total, total_pages}` so the UI can move through the full SQLite dataset without loading every listing into the first screen.
+The paginated endpoints return `{items, page, page_size, total, total_pages}` so the UI can move through the full dataset without loading every listing into the first screen.
 - `POST /research`
 - `POST /rag/query`
 

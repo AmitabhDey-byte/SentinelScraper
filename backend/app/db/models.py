@@ -56,6 +56,7 @@ class Product(Base):
     price_history: Mapped[list["PriceHistory"]] = relationship(
         back_populates="product", cascade="all, delete-orphan"
     )
+    favorites: Mapped[list["Favorite"]] = relationship(back_populates="product", cascade="all, delete-orphan")
 
 
 class PriceHistory(Base):
@@ -87,3 +88,33 @@ class Incident(Base):
     narration_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     collector: Mapped[Collector] = relationship(back_populates="incidents")
+
+
+class Favorite(Base):
+    """A Clerk subject's saved product. The subject is intentionally provider-agnostic."""
+
+    __tablename__ = "favorites"
+    __table_args__ = (Index("ix_favorites_user_product", "user_id", "product_id_fk", unique=True),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    product_id_fk: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+    product: Mapped[Product] = relationship(back_populates="favorites")
+
+
+class Operation(Base):
+    """Persisted evidence for a user-triggered Bright Data operation."""
+
+    __tablename__ = "operations"
+    __table_args__ = (Index("ix_operations_started_at", "started_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(48), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    incident_id_fk: Mapped[int | None] = mapped_column(ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    events: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False, default=list)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -16,7 +16,8 @@ jobs:
       BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GEMINI_MODEL: gemini-2.5-flash-lite
-      DATABASE_URL: sqlite:///./backend/sentinelscrape.db
+      # Neon persists collectors, observations, incidents, and watchlists across cron runs.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
       AUTO_APPROVE_HEALS: "true"
     steps:
       - name: Check out SentinelScrape
