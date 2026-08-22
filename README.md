@@ -176,7 +176,7 @@ The repository includes a `Dockerfile` and a free-tier `render.yaml`. Render ser
 
 4. In GitHub Actions, add `DATABASE_URL`, `BRIGHTDATA_API_TOKEN`, and `GEMINI_API_KEY` as repository secrets. The `sentinel-self-heal` workflow is the production scheduler and writes its results to Neon.
 
-Production intentionally makes operation reads public but hides write controls. Visitors can inspect the latest automatic operation and its timestamped transcript, while GitHub Actions owns expensive Bright Data mutations. `OPERATIONS_API_TOKEN` never goes into Vercel or browser code.
+Production intentionally makes operation reads public but hides write controls. Visitors can inspect the latest automatic operation and its timestamped transcript, while GitHub Actions owns expensive Bright Data mutations. The hosted watchlist is stored in each visitor's browser, so it remains useful without exposing user data. `OPERATIONS_API_TOKEN` never goes into Vercel or browser code.
 
 ## GitHub Actions: scrapers in CI
 

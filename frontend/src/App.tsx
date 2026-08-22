@@ -274,6 +274,8 @@ function SignalSummary({
 }
 
 const manualOperationsEnabled = import.meta.env.VITE_MANUAL_OPERATIONS !== "false";
+const hostedDemo = !manualOperationsEnabled;
+const watchlistStorageKey = "sentinelscrape-watchlist";
 
 function HealingConsole({
   operation,
@@ -307,7 +309,7 @@ function HealingConsole({
       <div className="healing-actions">
         {manualOperationsEnabled ? <button type="button" className="operation-primary" onClick={onScan} disabled={busy}>
           {busy && operation?.kind === "scan" ? "Scanning collectors…" : "Run Bright Data scan"}
-        </button> : <p className="automatic-note">Automatic Render watch is active. This panel shows the latest verified cycle.</p>}
+        </button> : <p className="automatic-note">GitHub Actions watch is active. This panel shows the latest verified cycle.</p>}
         {manualOperationsEnabled && openIncident && (
           <>
             <button type="button" onClick={() => onProposeHeal(openIncident.id)} disabled={busy}>
@@ -1110,6 +1112,16 @@ function App() {
   }, [refresh]);
 
   const refreshPersonal = useCallback(async () => {
+    if (hostedDemo) {
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(watchlistStorageKey) ?? "[]");
+        setFavorites(Array.isArray(saved) ? saved as Product[] : []);
+      } catch {
+        setFavorites([]);
+      }
+      setProfile(null);
+      return;
+    }
     try {
       const [nextProfile, nextFavorites] = await Promise.all([api.profile(), api.favorites()]);
       setProfile(nextProfile);
@@ -1172,13 +1184,21 @@ function App() {
   const favoriteIds = useMemo(() => new Set(favorites.map((product) => product.id)), [favorites]);
   const toggleFavorite = useCallback(async (product: Product) => {
     const wasFavorite = favoriteIds.has(product.id);
+    if (hostedDemo) {
+      const nextFavorites = wasFavorite
+        ? favorites.filter((favorite) => favorite.id !== product.id)
+        : [product, ...favorites];
+      window.localStorage.setItem(watchlistStorageKey, JSON.stringify(nextFavorites));
+      setFavorites(nextFavorites);
+      return;
+    }
     try {
       await (wasFavorite ? api.removeFavorite(product.id) : api.saveFavorite(product.id));
       await refreshPersonal();
     } catch {
       // A failed save is non-destructive; the current displayed list remains truthful.
     }
-  }, [favoriteIds, refreshPersonal]);
+  }, [favoriteIds, favorites, refreshPersonal]);
 
   const jumpTo = useCallback((section: string) => {
     const scroll = () => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
