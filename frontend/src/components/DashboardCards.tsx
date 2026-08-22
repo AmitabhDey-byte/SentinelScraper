@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import type { Alert, CollectorStatus, Incident, Product } from "../types";
 import { Sparkline } from "./Sparkline";
 
@@ -32,29 +33,57 @@ function siteClass(site: string) {
 export function StockPill({ value }: { value: string | null }) {
   const normalized = value?.toLowerCase() ?? "unknown";
   const unavailable = /out|unavailable|sold/.test(normalized);
-  const state = unavailable ? "stock-out" : value ? "stock-in" : "stock-unknown";
+  const state = unavailable
+    ? "stock-out"
+    : value
+      ? "stock-in"
+      : "stock-unknown";
 
-  return <span className={`stock-pill ${state}`}><i />{value ?? "No signal"}</span>;
+  return (
+    <span className={`stock-pill ${state}`}>
+      <i />
+      {value ?? "No signal"}
+    </span>
+  );
 }
 
-export function ProductRow({ product }: { product: Product }) {
+export function ProductRow({
+  product,
+  index = 0,
+}: {
+  product: Product;
+  index?: number;
+}) {
   return (
-    <a className="market-row" href={product.listing_url || "#"} target="_blank" rel="noreferrer">
+    <motion.a
+      className="market-row"
+      href={product.listing_url || "#"}
+      target="_blank"
+      rel="noreferrer"
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: Math.min(index, 7) * 0.035, duration: 0.24 }}
+      whileHover={{ x: 5 }}
+    >
       <div className="product-cell">
         {product.image_url ? (
           <img src={product.image_url} alt="" loading="lazy" />
         ) : (
-          <div className="image-placeholder" aria-hidden="true">▦</div>
+          <div className="image-placeholder" aria-hidden="true">
+            ▦
+          </div>
         )}
         <div>
-          <span className={siteClass(product.site_name)}>{product.site_name}</span>
+          <span className={siteClass(product.site_name)}>
+            {product.site_name}
+          </span>
           <strong>{product.name}</strong>
         </div>
       </div>
       <span className="price-cell">{formatPrice(product.price)}</span>
       <StockPill value={product.stock_status} />
       <Sparkline values={product.price_history.map((point) => point.price)} />
-    </a>
+    </motion.a>
   );
 }
 
@@ -65,55 +94,81 @@ export function AlertCard({ alert }: { alert: Alert }) {
     : alert.stock_status;
 
   return (
-    <article className={`alert-card ${isDrop ? "alert-drop" : "alert-restock"}`}>
-      <div className="alert-icon" aria-hidden="true">{isDrop ? "↓" : "↗"}</div>
+    <motion.article
+      className={`alert-card ${isDrop ? "alert-drop" : "alert-restock"}`}
+      whileHover={{ x: 4 }}
+    >
+      <div className="alert-icon" aria-hidden="true">
+        {isDrop ? "↓" : "↗"}
+      </div>
       <div className="alert-copy">
         <div className="alert-topline">
-          <span>{isDrop ? "Price drop" : "Restocked"}</span>
+          <span>{isDrop ? "DROP" : "BACK IN"}</span>
           <time>{relativeTime(alert.observed_at)}</time>
         </div>
         <strong>{alert.product_name}</strong>
-        <small>{alert.site_name} · {detail}</small>
+        <small>
+          {alert.site_name} · {detail}
+        </small>
       </div>
-    </article>
+    </motion.article>
   );
 }
 
 export function TrustCard({ incident }: { incident: Incident }) {
-  const statusClass = incident.status === "healed" ? "status-healed" : "status-open";
+  const statusClass =
+    incident.status === "healed" ? "status-healed" : "status-open";
   const source = incident.narration_source ?? "pending";
 
   return (
-    <article className="trust-card">
+    <motion.article className="trust-card" whileHover={{ x: 4 }}>
       <div className="trust-card-head">
-        <div className="trust-mark" aria-hidden="true">✦</div>
+        <div className="trust-mark" aria-hidden="true">
+          ✦
+        </div>
         <div>
-          <span className={siteClass(incident.site_name)}>{incident.site_name}</span>
+          <span className={siteClass(incident.site_name)}>
+            {incident.site_name}
+          </span>
           <time>{relativeTime(incident.detected_at)}</time>
         </div>
         <span className={`status-badge ${statusClass}`}>{incident.status}</span>
       </div>
-      <p>{incident.narration_text ?? "Extraction drift detected. Waiting for an approved Bright Data heal."}</p>
+      <p>
+        {incident.narration_text ?? "Field breach detected. Awaiting repair."}
+      </p>
       <div className="trust-meta">
-        <span><b>broken</b>{incident.dropped_fields.join(", ") || "—"}</span>
-        <span><b>healed</b>{incident.recovered_fields.join(", ") || "pending"}</span>
+        <span>
+          <b>broken</b>
+          {incident.dropped_fields.join(", ") || "—"}
+        </span>
+        <span>
+          <b>healed</b>
+          {incident.recovered_fields.join(", ") || "pending"}
+        </span>
       </div>
       <div className="trust-footer">
-        <span>{incident.rows_prev} rows → {incident.rows_curr} rows</span>
+        <span>
+          {incident.rows_prev} rows → {incident.rows_curr} rows
+        </span>
         <span className={`source-badge source-${source}`}>
           {incident.narration_source ?? "awaiting narration"}
         </span>
       </div>
-    </article>
+    </motion.article>
   );
 }
 
-export function CollectorRail({ collectors }: { collectors: CollectorStatus[] }) {
+export function CollectorRail({
+  collectors,
+}: {
+  collectors: CollectorStatus[];
+}) {
   if (!collectors.length) {
     return (
       <div className="collector-rail collector-rail-empty">
         <span className="rail-label">collector health</span>
-        <span>Register the five Scraper Studio collectors to start the network.</span>
+        <span>Register the five collectors to bring the network online.</span>
       </div>
     );
   }
@@ -123,12 +178,18 @@ export function CollectorRail({ collectors }: { collectors: CollectorStatus[] })
       <span className="rail-label">collector health</span>
       <div className="collector-list">
         {collectors.map((collector) => {
-          const label = collector.status === "healthy"
-            ? "green"
-            : collector.status.replace("_", " ");
+          const label =
+            collector.status === "healthy"
+              ? "clear"
+              : collector.status === "attention"
+                ? "repair"
+                : collector.status.replace("_", " ");
 
           return (
-            <span className={`collector-chip collector-${collector.status}`} key={collector.collector_id}>
+            <span
+              className={`collector-chip collector-${collector.status}`}
+              key={collector.collector_id}
+            >
               <i />
               {collector.site_name}
               <small>{label}</small>

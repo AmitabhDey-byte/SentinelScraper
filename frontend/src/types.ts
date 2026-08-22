@@ -54,3 +54,15 @@ export type CollectorStatus = {
   row_count: number | null;
   open_incidents: number;
 };
+
+export type Page<T> = {
+  items: T[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+};
+
+export type ProductPage = Page<Product>;
+export type AlertPage = Page<Alert>;
+export type IncidentPage = Page<Incident>;

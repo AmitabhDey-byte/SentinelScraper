@@ -10,15 +10,17 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "framer-motion": "^13.1.1",
     "react": "latest",
     "react-dom": "latest"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "typescript": "latest",
-    "vitest": "latest",
     "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "prettier": "^3.9.6",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest"
   }
 }

@@ -1,20 +1,37 @@
 """Small subprocess adapter for the Bright Data ``bdata`` CLI."""
 
 from pathlib import Path
+import os
+import shutil
 import subprocess
+
+from app.config import settings
 
 
 class BrightDataCLI:
     def __init__(self, executable: str = "bdata") -> None:
-        self.executable = executable
+        # npm installs Windows command shims (bdata.cmd and bdata.ps1). Python
+        # cannot launch the PowerShell shim by the bare ``bdata`` name, so
+        # resolve the executable before handing it to subprocess.
+        self.executable = shutil.which(executable) or executable
 
     def _run(self, args: list[str]) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            [self.executable, *args],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        environment = os.environ.copy()
+        if settings.brightdata_api_token:
+            environment.setdefault("BRIGHTDATA_API_TOKEN", settings.brightdata_api_token)
+            environment.setdefault("BRIGHTDATA_API_KEY", settings.brightdata_api_token)
+        try:
+            return subprocess.run(
+                [self.executable, *args],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+        except subprocess.CalledProcessError as exc:
+            details = "\n".join(part.strip() for part in (exc.stdout, exc.stderr) if part and part.strip())
+            message = f"Bright Data CLI failed with exit code {exc.returncode}"
+            raise RuntimeError(f"{message}: {details or 'no diagnostic output'}") from exc
 
     def create(self, url: str, field_description: str, name: str) -> str:
         result = self._run(["scraper", "create", url, field_description, "--name", name])
@@ -26,7 +43,9 @@ class BrightDataCLI:
 
     def run(self, collector_id: str, url: str, output_path: Path) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        self._run(["scraper", "run", collector_id, "--url", url, "-o", str(output_path)])
+        # Current Bright Data CLI versions accept the single run URL as the
+        # positional argument. ``--url`` is reserved for heal/approve hints.
+        self._run(["scraper", "run", collector_id, url, "-o", str(output_path)])
 
     def heal(self, collector_id: str, url: str, hint: str, output_path: Path) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)

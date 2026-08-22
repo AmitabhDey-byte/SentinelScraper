@@ -123,7 +123,14 @@ cd frontend
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. The dashboard has three panels:
+Open `http://127.0.0.1:5173`. The frontend now has four focused views:
+
+- **Landing:** the self-healing loop as the product story.
+- **Control room:** paginated market listings with search, market filters, price sparklines, signals, and the Trust Layer.
+- **Signals:** a larger impact desk for filtering price drops and restocks.
+- **Trust layer / Network:** the full incident trace and per-collector health views.
+
+The control room has three core panels:
 
 - **Live listings:** product, latest price, availability, listing link, and price-history sparkline.
 - **Alerts:** latest price drops and restocks derived from adjacent observations.
@@ -182,9 +189,11 @@ The second command runs `bdata scraper heal`, verifies the recovered fields, cal
 
 - `GET /health`
 - `GET /collectors`
-- `GET /products?site=eBay&limit=100`
-- `GET /incidents?limit=50`
-- `GET /alerts?limit=50`
+- `GET /products?site=eBay&page=1&page_size=8&q=laptop`
+- `GET /incidents?page=1&page_size=50`
+- `GET /alerts?page=1&page_size=50`
+
+The paginated endpoints return `{items, page, page_size, total, total_pages}` so the UI can move through the full SQLite dataset without loading every listing into the first screen.
 - `POST /research`
 - `POST /rag/query`
 

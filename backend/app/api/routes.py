@@ -5,15 +5,18 @@ from collections.abc import Sequence
 from fastapi import APIRouter, Depends, Query
 from pathlib import Path
 from uuid import uuid4
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.schemas import (
     AlertResponse,
+    AlertPageResponse,
     CollectorStatusResponse,
     IncidentResponse,
+    IncidentPageResponse,
     PricePoint,
     ProductResponse,
+    ProductPageResponse,
     RagQueryRequest,
     RagQueryResponse,
     ResearchRequest,
@@ -94,21 +97,35 @@ def _history_points(history: Sequence[PriceHistory]) -> list[PricePoint]:
     ]
 
 
-@router.get("/products", response_model=list[ProductResponse])
+@router.get("/products", response_model=ProductPageResponse)
 def list_products(
     site: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=500),
+    q: str | None = Query(default=None, min_length=1, max_length=120),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=8, ge=1, le=50),
     db: Session = Depends(get_db),
-) -> list[ProductResponse]:
+) -> ProductPageResponse:
+    count_statement = select(func.count(Product.id)).join(Product.collector)
+    if site:
+        count_statement = count_statement.where(Collector.site_name.ilike(site))
+    if q:
+        count_statement = count_statement.where(Product.name.ilike(f"%{q}%"))
+
+    total = db.scalar(count_statement) or 0
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, total_pages)
     statement = (
         select(Product)
         .join(Product.collector)
         .options(selectinload(Product.collector), selectinload(Product.price_history))
         .order_by(Product.last_seen_at.desc())
-        .limit(limit)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
     if site:
         statement = statement.where(Collector.site_name.ilike(site))
+    if q:
+        statement = statement.where(Product.name.ilike(f"%{q}%"))
 
     products = db.scalars(statement).unique().all()
     response: list[ProductResponse] = []
@@ -127,22 +144,33 @@ def list_products(
                 price_history=_history_points(product.price_history),
             )
         )
-    return response
+    return ProductPageResponse(
+        items=response,
+        page=page,
+        page_size=page_size,
+        total=total,
+        total_pages=total_pages,
+    )
 
 
-@router.get("/incidents", response_model=list[IncidentResponse])
+@router.get("/incidents", response_model=IncidentPageResponse)
 def list_incidents(
-    limit: int = Query(default=50, ge=1, le=200),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=8, ge=1, le=50),
     db: Session = Depends(get_db),
-) -> list[IncidentResponse]:
+) -> IncidentPageResponse:
+    total = db.scalar(select(func.count(Incident.id))) or 0
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, total_pages)
     statement = (
         select(Incident)
         .options(selectinload(Incident.collector))
         .order_by(Incident.detected_at.desc())
-        .limit(limit)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
     incidents = db.scalars(statement).unique().all()
-    return [
+    response = [
         IncidentResponse(
             id=incident.id,
             collector_id=incident.collector.collector_id,
@@ -159,6 +187,13 @@ def list_incidents(
         )
         for incident in incidents
     ]
+    return IncidentPageResponse(
+        items=response,
+        page=page,
+        page_size=page_size,
+        total=total,
+        total_pages=total_pages,
+    )
 
 
 def _is_in_stock(status: str | None) -> bool:
@@ -169,11 +204,12 @@ def _is_in_stock(status: str | None) -> bool:
     return not any(term in normalized for term in unavailable)
 
 
-@router.get("/alerts", response_model=list[AlertResponse])
+@router.get("/alerts", response_model=AlertPageResponse)
 def list_alerts(
-    limit: int = Query(default=50, ge=1, le=200),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=8, ge=1, le=50),
     db: Session = Depends(get_db),
-) -> list[AlertResponse]:
+) -> AlertPageResponse:
     products = db.scalars(
         select(Product)
         .options(selectinload(Product.collector), selectinload(Product.price_history))
@@ -222,4 +258,14 @@ def list_alerts(
             )
 
     alerts.sort(key=lambda alert: alert.observed_at, reverse=True)
-    return alerts[:limit]
+    total = len(alerts)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+    return AlertPageResponse(
+        items=alerts[start : start + page_size],
+        page=page,
+        page_size=page_size,
+        total=total,
+        total_pages=total_pages,
+    )

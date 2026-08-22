@@ -17,4 +17,5 @@ frontend/dist/
 frontend/vite.config.js
 frontend/vite.config.d.ts
 *.tsbuildinfo
+.superdesign/tmp/
 .DS_Store

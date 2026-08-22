@@ -22,6 +22,14 @@ class ProductResponse(BaseModel):
     price_history: list[PricePoint]
 
 
+class ProductPageResponse(BaseModel):
+    items: list[ProductResponse]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
 class IncidentResponse(BaseModel):
     id: int
     collector_id: str
@@ -37,6 +45,14 @@ class IncidentResponse(BaseModel):
     status: str
 
 
+class IncidentPageResponse(BaseModel):
+    items: list[IncidentResponse]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
 class AlertResponse(BaseModel):
     type: str
     product_id: int
@@ -49,6 +65,14 @@ class AlertResponse(BaseModel):
     delta: float | None
     observed_at: datetime
     stock_status: str | None
+
+
+class AlertPageResponse(BaseModel):
+    items: list[AlertResponse]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
 
 
 class CollectorStatusResponse(BaseModel):

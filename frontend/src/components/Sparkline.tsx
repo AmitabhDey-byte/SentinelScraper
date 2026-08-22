@@ -21,9 +21,13 @@ export function Sparkline({ values, positive = false }: SparklineProps) {
     .join(" ");
 
   return (
-    <svg className={`sparkline ${positive ? "sparkline-positive" : ""}`} viewBox="0 0 72 24" role="img" aria-label="Price history sparkline">
+    <svg
+      className={`sparkline ${positive ? "sparkline-positive" : ""}`}
+      viewBox="0 0 72 24"
+      role="img"
+      aria-label="Price history sparkline"
+    >
       <polyline points={points} fill="none" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
-
