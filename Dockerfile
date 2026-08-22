@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 python3
     && python3 -m venv /opt/venv
 
 COPY requirements.txt ./
+COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt && npm install --global @brightdata/cli
 
 COPY backend ./backend
