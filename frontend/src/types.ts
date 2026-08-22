@@ -88,7 +88,7 @@ export type OperationEvent = {
 
 export type Operation = {
   id: string;
-  kind: "scan" | "heal_proposal" | "approve_and_verify";
+  kind: "scan" | "heal_proposal" | "approve_and_verify" | "auto_heal";
   status: "queued" | "running" | "completed" | "completed_with_errors" | "failed";
   incident_id: number | null;
   started_at: string;

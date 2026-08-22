@@ -1,0 +1,9 @@
+.git
+.venv
+.venv-1
+frontend
+sentinelscrape.db
+backend/output
+**/__pycache__
+*.pyc
+.env

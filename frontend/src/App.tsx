@@ -273,6 +273,8 @@ function SignalSummary({
   );
 }
 
+const manualOperationsEnabled = import.meta.env.VITE_MANUAL_OPERATIONS !== "false";
+
 function HealingConsole({
   operation,
   incidents,
@@ -288,7 +290,7 @@ function HealingConsole({
 }) {
   const busy = operation?.status === "queued" || operation?.status === "running";
   const openIncident = incidents.items.find((incident) => incident.status === "open");
-  const stage = operation?.kind === "approve_and_verify" ? "approve + verify" : operation?.kind === "heal_proposal" ? "heal proposal" : operation?.kind === "scan" ? "scan network" : "ready";
+  const stage = operation?.kind === "approve_and_verify" ? "approve + verify" : operation?.kind === "heal_proposal" ? "heal proposal" : operation?.kind === "scan" ? "scan network" : operation?.kind === "auto_heal" ? "automatic watch" : "ready";
   return (
     <section className="healing-console" aria-label="Self-healing operation console">
       <div className="healing-console-title">
@@ -303,10 +305,10 @@ function HealingConsole({
         <span className={operation?.status === "completed" ? "active" : ""}>04 Prove</span>
       </div>
       <div className="healing-actions">
-        <button type="button" className="operation-primary" onClick={onScan} disabled={busy}>
+        {manualOperationsEnabled ? <button type="button" className="operation-primary" onClick={onScan} disabled={busy}>
           {busy && operation?.kind === "scan" ? "Scanning collectors…" : "Run Bright Data scan"}
-        </button>
-        {openIncident && (
+        </button> : <p className="automatic-note">Automatic Render watch is active. This panel shows the latest verified cycle.</p>}
+        {manualOperationsEnabled && openIncident && (
           <>
             <button type="button" onClick={() => onProposeHeal(openIncident.id)} disabled={busy}>
               Propose AI heal
@@ -941,13 +943,11 @@ function IntelligencePage({
 
 function ProfilePage({
   profile,
-  identity,
   favorites,
   onSelectProduct,
   onJump,
 }: {
   profile: Profile | null;
-  identity: { label: string; authenticated: boolean };
   favorites: Product[];
   onSelectProduct: (product: Product) => void;
   onJump: (section: string) => void;
@@ -956,12 +956,8 @@ function ProfilePage({
     <section className="profile-section" id="profile">
       <div className="profile-sheet">
         <p className="eyebrow">06 / YOUR WATCHLIST</p>
-        <h2>{identity.authenticated ? `${identity.label}'s cabinet` : "The local observer's cabinet"}</h2>
-        <p>
-          {identity.authenticated
-            ? "Your saved listings are attached to this protected operator session."
-            : "Local mode is ready for a demo. Saved listings stay in this SentinelScrape database."}
-        </p>
+        <h2>The observer's cabinet</h2>
+        <p>Saved listings stay in this SentinelScrape database and are ready for a local demo.</p>
         <div className="profile-stats">
           <span><b>{profile?.favorites_count ?? favorites.length}</b> saved</span>
           <span><b>{profile?.auth_mode === "operator" ? "operator" : "local"}</b> identity</span>
@@ -1004,7 +1000,6 @@ function ScrollObservatory({
   insightLoading,
   onInsightRefresh,
   profile,
-  identity,
   favorites,
   onJump,
   operation,
@@ -1029,7 +1024,6 @@ function ScrollObservatory({
   insightLoading: boolean;
   onInsightRefresh: () => void;
   profile: Profile | null;
-  identity: { label: string; authenticated: boolean };
   favorites: Product[];
   onJump: (section: string) => void;
   operation: Operation | null;
@@ -1046,7 +1040,7 @@ function ScrollObservatory({
       <div id="trust"><TrustPage data={data} navigate={scrollNavigate} /></div>
       <IntelligencePage insight={insight} loading={insightLoading} onRefresh={onInsightRefresh} />
       <div id="network"><NetworkPage data={data} navigate={scrollNavigate} /></div>
-      <ProfilePage profile={profile} identity={identity} favorites={favorites} onSelectProduct={onSelectProduct} onJump={onJump} />
+      <ProfilePage profile={profile} favorites={favorites} onSelectProduct={onSelectProduct} onJump={onJump} />
     </div>
   );
 }
@@ -1066,13 +1060,7 @@ function Footer({ lastUpdated }: { lastUpdated: Date | null }) {
   );
 }
 
-function App({
-  identity = { label: "Local observer", authenticated: false },
-  accountControl,
-}: {
-  identity?: { label: string; authenticated: boolean };
-  accountControl?: ReactNode;
-}) {
+function App() {
   const { route, navigate } = useRoute();
   const [data, setData] = useState<DashboardState>(emptyState);
   const [loading, setLoading] = useState(true);
@@ -1133,7 +1121,7 @@ function App({
 
   useEffect(() => {
     void refreshPersonal();
-  }, [refreshPersonal, identity.authenticated]);
+  }, [refreshPersonal]);
 
   const refreshInsight = useCallback(async () => {
     setInsightLoading(true);
@@ -1226,7 +1214,6 @@ function App({
         insightLoading={insightLoading}
         onInsightRefresh={() => void refreshInsight()}
         profile={profile}
-        identity={identity}
         favorites={favorites}
         onJump={jumpTo}
       />
@@ -1319,15 +1306,14 @@ function App({
           <span className="live-indicator">
             <i /> {error ? "signal paused" : "signal live"}
           </span>
-          <button
+          {manualOperationsEnabled && <button
             className="refresh-button"
             type="button"
             onClick={() => void startOperation(api.scan)}
             disabled={operation?.status === "queued" || operation?.status === "running"}
           >
             {operation?.status === "queued" || operation?.status === "running" ? "scan running…" : "run live scan"} <span>⌘</span>
-          </button>
-          {accountControl}
+          </button>}
         </div>
       </header>
       <AnimatePresence mode="wait">

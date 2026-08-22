@@ -370,9 +370,7 @@ def approve_heal(
 
 
 @router.get("/operations/latest", response_model=OperationResponse | None)
-def latest_operation(
-    _: str = Depends(current_user_id), db: Session = Depends(get_db)
-) -> OperationResponse | None:
+def latest_operation(db: Session = Depends(get_db)) -> OperationResponse | None:
     operation = db.scalar(select(Operation).order_by(Operation.started_at.desc()).limit(1))
     return _operation_response(operation) if operation else None
 
@@ -380,7 +378,6 @@ def latest_operation(
 @router.get("/operations/{operation_id}", response_model=OperationResponse)
 def get_operation(
     operation_id: str,
-    _: str = Depends(current_user_id),
     db: Session = Depends(get_db),
 ) -> OperationResponse:
     operation = db.get(Operation, operation_id)

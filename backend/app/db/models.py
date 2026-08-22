@@ -91,7 +91,7 @@ class Incident(Base):
 
 
 class Favorite(Base):
-    """A Clerk subject's saved product. The subject is intentionally provider-agnostic."""
+    """A saved product for a local observer or protected operator."""
 
     __tablename__ = "favorites"
     __table_args__ = (Index("ix_favorites_user_product", "user_id", "product_id_fk", unique=True),)

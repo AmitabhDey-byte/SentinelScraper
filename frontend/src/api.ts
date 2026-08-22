@@ -11,17 +11,9 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
-let tokenGetter: (() => Promise<string | null>) | undefined;
-
-export function configureApiAuth(getToken?: () => Promise<string | null>) {
-  tokenGetter = getToken;
-}
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = await tokenGetter?.();
   const headers = new Headers(init?.headers);
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (!token) headers.set("X-SentinelScrape-Demo-User", "local-observer");
+  headers.set("X-SentinelScrape-Demo-User", "local-observer");
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
