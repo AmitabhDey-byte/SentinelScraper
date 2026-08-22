@@ -30,12 +30,16 @@ settings = Settings()
 
 
 def normalize_database_url(database_url: str) -> str:
-    """Resolve local SQLite URLs from the repository root, independent of cwd."""
+    """Normalize local SQLite and standard PostgreSQL URLs for SQLAlchemy."""
 
     prefix = "sqlite:///./"
     if database_url.startswith(prefix):
         database_path = (REPO_ROOT / database_url.removeprefix(prefix)).resolve()
         return f"sqlite:///{database_path.as_posix()}"
+    if database_url.startswith("postgres://"):
+        return f"postgresql+psycopg://{database_url.removeprefix('postgres://')}"
+    if database_url.startswith("postgresql://"):
+        return f"postgresql+psycopg://{database_url.removeprefix('postgresql://')}"
     return database_url
 
 
