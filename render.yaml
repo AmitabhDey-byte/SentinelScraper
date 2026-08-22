@@ -2,7 +2,7 @@ services:
   - type: web
     name: sentinelscrape-api
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /health
     dockerfilePath: ./Dockerfile
     dockerContext: .
@@ -20,24 +20,4 @@ services:
       - key: CORS_ORIGINS
         sync: false
       - key: OPERATIONS_API_TOKEN
-        sync: false
-  - type: cron
-    name: sentinelscrape-auto-heal
-    runtime: docker
-    schedule: "*/30 * * * *"
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    dockerCommand: python -m alembic -c backend/alembic.ini upgrade head && python scripts/ci_self_heal.py
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: AUTO_APPROVE_HEALS
-        value: "true"
-      - key: DATABASE_URL
-        sync: false
-      - key: BRIGHTDATA_API_TOKEN
-        sync: false
-      - key: BRIGHTDATA_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
         sync: false

@@ -167,14 +167,16 @@ Expected output is `rating` in both `detected` and `recovered`. For a live proof
 
 ## Deploy: Render + Neon + Vercel
 
-The repository includes a `Dockerfile` and `render.yaml`. The Render web service serves the API; the Render cron service runs the fully automatic scan → detect → heal → approve → verify cycle every 30 minutes. Both must point at the same Neon database, so the public dashboard can display the persistent Trust Layer evidence.
+The repository includes a `Dockerfile` and a free-tier `render.yaml`. Render serves the API, while the included GitHub Actions workflow runs the automatic scan → detect → heal → approve → verify cycle every 30 minutes. Both use Neon, so the public dashboard can display persistent Trust Layer evidence without a paid Render cron service.
 
 1. Create a Neon database and copy its pooled connection string into `DATABASE_URL` using `postgresql+psycopg://...`.
-2. In Render, create a Blueprint from this repository. Fill `DATABASE_URL`, `BRIGHTDATA_API_TOKEN`, `BRIGHTDATA_API_KEY`, `GEMINI_API_KEY`, and a long random `OPERATIONS_API_TOKEN` for the web service. Give the cron service the same database and Bright Data/Gemini values.
+2. In Render, create a Blueprint from this repository. The API uses the Free instance. Fill `DATABASE_URL`, `BRIGHTDATA_API_TOKEN`, `BRIGHTDATA_API_KEY`, `GEMINI_API_KEY`, and a long random `OPERATIONS_API_TOKEN`.
 3. After Vercel creates the frontend deployment, set the web service `CORS_ORIGINS` to `https://YOUR-VERCEL-DOMAIN`. Redeploy the API.
 4. In Vercel, set the project root directory to `frontend`. Add `VITE_API_BASE_URL=https://YOUR-RENDER-API.onrender.com` and `VITE_MANUAL_OPERATIONS=false`, then deploy.
 
-Production intentionally makes operation reads public but hides write controls. Visitors can inspect the latest automatic operation and its timestamped transcript, while only the server-side Render cron owns expensive Bright Data mutations. `OPERATIONS_API_TOKEN` never goes into Vercel or browser code.
+4. In GitHub Actions, add `DATABASE_URL`, `BRIGHTDATA_API_TOKEN`, and `GEMINI_API_KEY` as repository secrets. The `sentinel-self-heal` workflow is the production scheduler and writes its results to Neon.
+
+Production intentionally makes operation reads public but hides write controls. Visitors can inspect the latest automatic operation and its timestamped transcript, while GitHub Actions owns expensive Bright Data mutations. `OPERATIONS_API_TOKEN` never goes into Vercel or browser code.
 
 ## GitHub Actions: scrapers in CI
 
