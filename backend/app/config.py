@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     scheduler_interval_minutes: int = 30
+    competitor_sources_json: str = "[]"
+    slack_webhook_url: str = ""
+    discord_webhook_url: str = ""
 
     model_config = SettingsConfigDict(env_file=str(REPO_ROOT / ".env"), extra="ignore")
 

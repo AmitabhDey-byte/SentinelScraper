@@ -60,3 +60,42 @@ class CollectorStatusResponse(BaseModel):
     last_run_status: str | None
     row_count: int | None
     open_incidents: int
+
+
+class ResearchRequest(BaseModel):
+    keyword: str
+    country: str | None = None
+    search_type: str = "shopping"
+    limit: int = 10
+
+
+class ResearchItemResponse(BaseModel):
+    title: str
+    url: str
+    snippet: str
+    price: str | None
+
+
+class ResearchResponse(BaseModel):
+    keyword: str
+    country: str | None
+    search_type: str
+    summary: str
+    results: list[ResearchItemResponse]
+    raw_output: str
+
+
+class Citation(BaseModel):
+    url: str
+    title: str
+
+
+class RagQueryRequest(BaseModel):
+    question: str
+    index_path: str = "backend/output/rag/index.json"
+    top_k: int = 5
+
+
+class RagQueryResponse(BaseModel):
+    answer: str
+    citations: list[Citation]

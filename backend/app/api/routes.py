@@ -3,15 +3,50 @@
 from collections.abc import Sequence
 
 from fastapi import APIRouter, Depends, Query
+from pathlib import Path
+from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.schemas import AlertResponse, CollectorStatusResponse, IncidentResponse, PricePoint, ProductResponse
+from app.api.schemas import (
+    AlertResponse,
+    CollectorStatusResponse,
+    IncidentResponse,
+    PricePoint,
+    ProductResponse,
+    RagQueryRequest,
+    RagQueryResponse,
+    ResearchRequest,
+    ResearchResponse,
+)
 from app.db.models import Collector, Incident, PriceHistory, Product
 from app.db.session import get_db
+from app.services.search_agent import KeywordResearchAgent
+from app.services.docs_rag import SitemapRag
 
 
 router = APIRouter()
+
+
+@router.post("/research", response_model=ResearchResponse)
+def research(request: ResearchRequest) -> ResearchResponse:
+    output_path = Path(__file__).resolve().parents[2] / "output" / "research" / f"{uuid4().hex}.json"
+    result = KeywordResearchAgent().research(
+        request.keyword,
+        output_path,
+        country=request.country,
+        search_type=request.search_type,
+        limit=request.limit,
+    )
+    return ResearchResponse.model_validate(result)
+
+
+@router.post("/rag/query", response_model=RagQueryResponse)
+def rag_query(request: RagQueryRequest) -> RagQueryResponse:
+    rag_root = Path(__file__).resolve().parents[2] / "output" / "rag"
+    index_path = rag_root / Path(request.index_path).name
+    answer = SitemapRag().answer(index_path, request.question, top_k=request.top_k)
+    return RagQueryResponse.model_validate(answer.model_dump())
 
 
 @router.get("/collectors", response_model=list[CollectorStatusResponse])

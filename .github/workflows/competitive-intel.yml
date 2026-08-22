@@ -1,0 +1,37 @@
+name: Weekly competitive intelligence
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 9 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  diff-and-deliver:
+    runs-on: ubuntu-latest
+    env:
+      BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+      BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+      COMPETITOR_SOURCES_JSON: ${{ secrets.COMPETITOR_SOURCES_JSON }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          npm install --global @brightdata/cli
+      - run: python scripts/competitive_intel.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weekly-competitive-intel
+          path: backend/output/competitive-intel/
+          if-no-files-found: ignore

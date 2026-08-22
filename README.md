@@ -32,12 +32,12 @@ backend/
   app/api/             FastAPI routes and response models
   app/db/              SQLAlchemy models, session, and metadata
   app/orchestration/   bdata adapter, polling loop, healing workflow
-  app/services/        completeness diffing and Gemini narration
+  app/services/        diffing, narration, RAG, search, and intel services
   alembic/              initial database migration
   tests/                fake snapshot and narration tests
 frontend/              React/Vite dashboard
-  scripts/               collector bootstrap, scheduler, and CI self-heal helpers
-  .github/workflows/     scheduled run/heal/re-run proof in GitHub Actions
+scripts/                collector bootstrap, scheduler, RAG, search, and battle helpers
+.github/workflows/      scheduled run/heal/re-run and weekly intel workflows
 ```
 
 ## Setup
@@ -66,6 +66,8 @@ Copy `.env.example` to `.env` and set:
 
 ```dotenv
 BRIGHTDATA_API_TOKEN=your_bright_data_token
+# If your CLI installation expects the alternate name, use the same value:
+BRIGHTDATA_API_KEY=your_bright_data_token
 GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-2.5-flash-lite
 DATABASE_URL=sqlite:///./backend/sentinelscrape.db
@@ -142,6 +144,23 @@ The collector-health rail above the panels is intentionally factual: each site i
 
 Local operation remains human-in-the-loop by default. Only the workflow sets `AUTO_APPROVE_HEALS=true`, making the “scrapers in CI, no humans” policy explicit and reviewable.
 
+## Resource track coverage
+
+The project now covers the relevant functionality from resources 04–09:
+
+- **04 — Self-healing scraper:** `scripts/demo_self_heal.py` creates a deterministic field break/recovery proof; the live path uses the detected incident description with `bdata scraper heal`, verifies recovery, approves, and re-runs.
+- **05 — Scrapers in CI:** `.github/workflows/sentinel-self-heal.yml` runs the complete loop on a cron and leaves a summary plus collector JSON artifacts.
+- **06 — Docs to RAG:** `scripts/build_docs_rag.py` uses Bright Data to fetch a sitemap and pages, chunks them, embeds them with `gemini-embedding-001` when configured, and stores a cited index. `scripts/query_docs.py` and `POST /rag/query` answer with source URLs.
+- **07 — Competitive intel:** `scripts/competitive_intel.py` diffs three to five configured competitor pages weekly and can deliver a short update to Slack or Discord. `.github/workflows/competitive-intel.yml` schedules it every Monday.
+- **08 — Keyword-powered agent:** `scripts/keyword_agent.py` and `POST /research` use Bright Data Search with a plain-English keyword, optional country, and search type.
+- **09 — Parallel scraper battle:** `scripts/parallel_scraper_battle.py` fans out independent site agents concurrently, scores extraction coverage, and writes a deterministic judge result to `battle.json`.
+
+Set `COMPETITOR_SOURCES_JSON` to a JSON array such as:
+
+```json
+[{"name":"Apify","url":"https://apify.com/changelog"},{"name":"Zyte","url":"https://www.zyte.com/changelog/"},{"name":"ScrapingBee","url":"https://www.scrapingbee.com/changelog/"}]
+```
+
 ## Demonstrate a heal
 
 When an incident is open, inspect it through `GET /incidents` or the Trust Layer. First propose a heal without approval:
@@ -162,9 +181,26 @@ The second command runs `bdata scraper heal`, verifies the recovered fields, cal
 ## API
 
 - `GET /health`
+- `GET /collectors`
 - `GET /products?site=eBay&limit=100`
 - `GET /incidents?limit=50`
 - `GET /alerts?limit=50`
+- `POST /research`
+- `POST /rag/query`
+
+Build a documentation index and query it:
+
+```bash
+python scripts/build_docs_rag.py https://docs.example.com/sitemap.xml
+python scripts/query_docs.py "How do I authenticate?"
+```
+
+Run keyword research or the parallel battle:
+
+```bash
+python scripts/keyword_agent.py "best laptop under $800" --country us
+python scripts/parallel_scraper_battle.py --sites ebay,newegg,target
+```
 
 ## Verification
 

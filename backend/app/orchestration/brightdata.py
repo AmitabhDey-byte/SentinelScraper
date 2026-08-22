@@ -35,3 +35,24 @@ class BrightDataCLI:
     def approve(self, collector_id: str) -> None:
         self._run(["scraper", "approve", collector_id])
 
+    def scrape(self, url: str, output_path: Path, *, format: str = "markdown") -> None:
+        """Fetch arbitrary web content through Bright Data's unlocker."""
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        self._run(["scrape", url, "-f", format, "-o", str(output_path)])
+
+    def search(
+        self,
+        query: str,
+        output_path: Path,
+        *,
+        country: str | None = None,
+        search_type: str = "shopping",
+    ) -> None:
+        """Run Bright Data Search with machine-readable JSON output."""
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        args = ["search", query, "--type", search_type, "--json", "-o", str(output_path)]
+        if country:
+            args.extend(["--country", country])
+        self._run(args)
