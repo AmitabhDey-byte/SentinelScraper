@@ -17,16 +17,19 @@ from app.sites import FIELD_DESCRIPTION, SITES  # noqa: E402
 def main() -> None:
     cli = BrightDataCLI()
     failures: list[str] = []
+    registered = 0
     with SessionLocal() as db:
         for slug, site in SITES.items():
             existing = db.scalar(select(Collector).where(Collector.site_name == site["name"]))
             if existing:
                 print(f"{site['name']}: already registered as {existing.collector_id}")
+                registered += 1
                 continue
             try:
                 collector_id = cli.create(site["url"], FIELD_DESCRIPTION, f"sentinelscrape-{slug}-laptops")
                 db.add(Collector(collector_id=collector_id, site_name=site["name"], category="laptops"))
                 db.commit()
+                registered += 1
                 print(f"{site['name']}: registered {collector_id}")
             except Exception as exc:
                 db.rollback()
@@ -34,7 +37,9 @@ def main() -> None:
                 print(f"{site['name']}: failed — {exc}", file=sys.stderr)
 
     if failures:
-        raise SystemExit("Collector bootstrap completed with failures:\n" + "\n".join(failures))
+        print("Collector bootstrap warnings:\n" + "\n".join(failures), file=sys.stderr)
+    if not registered:
+        raise SystemExit("No Bright Data collectors could be registered.")
 
 
 if __name__ == "__main__":

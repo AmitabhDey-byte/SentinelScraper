@@ -20,6 +20,7 @@ from app.services.narration import GeminiNarrator
 
 
 OUTPUT_DIR = Path(__file__).resolve().parents[2] / "output"
+INLINE_SNAPSHOT_PREFIX = "snapshot:"
 
 
 def _now() -> datetime:
@@ -50,6 +51,8 @@ def _rows(snapshot: Any) -> list[dict[str, Any]]:
 def _load_json(path: str | None) -> Any:
     if not path:
         return None
+    if path.startswith(INLINE_SNAPSHOT_PREFIX):
+        return json.loads(path.removeprefix(INLINE_SNAPSHOT_PREFIX))
     candidate = Path(path)
     if not candidate.is_absolute():
         candidate = Path(__file__).resolve().parents[2] / candidate
@@ -142,7 +145,9 @@ def run_collector(db: Session, collector: Collector, cli: BrightDataCLI, output_
             collector_id_fk=collector.id,
             run_at=started_at,
             row_count=len(rows),
-            raw_json_ref=str(output_path),
+            # Keep the baseline in Neon as well as on ephemeral worker disk so
+            # the next Render or GitHub Actions run can still perform its diff.
+            raw_json_ref=f"{INLINE_SNAPSHOT_PREFIX}{json.dumps(snapshot, separators=(',', ':'))}",
             status="success",
         )
         db.add(run)
@@ -249,6 +254,8 @@ def run_once(cli: BrightDataCLI | None = None) -> list[str]:
     failures: list[str] = []
     with SessionLocal() as db:
         collectors = db.scalars(select(Collector).order_by(Collector.site_name)).all()
+        if not collectors:
+            return ["No collectors are registered. Run scripts/bootstrap_collectors.py first."]
         for collector in collectors:
             try:
                 run_collector(db, collector, cli)

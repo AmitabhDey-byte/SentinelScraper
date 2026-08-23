@@ -174,7 +174,8 @@ The repository includes a `Dockerfile` and a free-tier `render.yaml`. Render ser
 3. After Vercel creates the frontend deployment, set the web service `CORS_ORIGINS` to `https://YOUR-VERCEL-DOMAIN`. Redeploy the API.
 4. In Vercel, set the project root directory to `frontend`. Add `VITE_API_BASE_URL=https://YOUR-RENDER-API.onrender.com` and `VITE_MANUAL_OPERATIONS=false`, then deploy.
 
-4. In GitHub Actions, add `DATABASE_URL`, `BRIGHTDATA_API_TOKEN`, and `GEMINI_API_KEY` as repository secrets. The `sentinel-self-heal` workflow is the production scheduler and writes its results to Neon.
+4. In GitHub Actions, add `DATABASE_URL`, `BRIGHTDATA_API_TOKEN`, and `GEMINI_API_KEY` as repository secrets. `DATABASE_URL` must be the same Neon database used by Render. The `sentinel-self-heal` workflow is the production scheduler and writes its results to Neon.
+5. Open **Actions → SentinelScrape self-heal → Run workflow** once after deployment. This creates the Bright Data collectors in Neon, runs the first laptop snapshot, and populates the public market table. Later runs happen every 30 minutes.
 
 Production intentionally makes operation reads public but hides write controls. Visitors can inspect the latest automatic operation and its timestamped transcript, while GitHub Actions owns expensive Bright Data mutations. An authorized operator can select **Operator mode** in the header, paste the Render-side `OPERATIONS_API_TOKEN`, then run a live scan or manually advance an incident through heal and approval. The hosted watchlist is stored in each visitor's browser, so it remains useful without exposing user data. Do not add `OPERATIONS_API_TOKEN` to Vercel: it is entered only by the operator at the moment it is needed.
 

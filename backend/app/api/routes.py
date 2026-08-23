@@ -88,6 +88,11 @@ def _run_scan_operation(operation_id: str) -> None:
             db.commit()
             collectors = db.scalars(select(Collector).order_by(Collector.site_name)).all()
 
+        if not collectors:
+            message = "No collectors are registered. Run the GitHub Actions self-heal workflow to bootstrap Bright Data collectors."
+            _finish_operation(operation_id, status_value="failed", error=message)
+            return
+
         for collector_id in [collector.id for collector in collectors]:
             with SessionLocal() as db:
                 operation = db.get(Operation, operation_id)
