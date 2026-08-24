@@ -1,6 +1,7 @@
 """Create Bright Data collectors for the tracked SentinelScrape sites."""
 
 from pathlib import Path
+import os
 import sys
 
 from sqlalchemy import select
@@ -18,7 +19,11 @@ def main() -> None:
     cli = BrightDataCLI()
     failures: list[str] = []
     registered = 0
+    excluded = {slug.strip() for slug in os.getenv("COLLECTOR_BOOTSTRAP_EXCLUDE", "").split(",") if slug.strip()}
     for slug, site in SITES.items():
+        if slug in excluded:
+            print(f"{site['name']}: skipped by COLLECTOR_BOOTSTRAP_EXCLUDE")
+            continue
         with SessionLocal() as db:
             existing = db.scalar(select(Collector).where(Collector.site_name == site["name"]))
         if existing:

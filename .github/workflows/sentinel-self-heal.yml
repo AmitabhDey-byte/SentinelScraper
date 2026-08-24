@@ -19,6 +19,7 @@ jobs:
       # Neon persists collectors, observations, incidents, and watchlists across cron runs.
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       AUTO_APPROVE_HEALS: "true"
+      COLLECTOR_BOOTSTRAP_EXCLUDE: "target"
     steps:
       - name: Check out SentinelScrape
         uses: actions/checkout@v4
