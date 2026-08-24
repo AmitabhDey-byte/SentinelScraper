@@ -18,23 +18,28 @@ def main() -> None:
     cli = BrightDataCLI()
     failures: list[str] = []
     registered = 0
-    with SessionLocal() as db:
-        for slug, site in SITES.items():
+    for slug, site in SITES.items():
+        with SessionLocal() as db:
             existing = db.scalar(select(Collector).where(Collector.site_name == site["name"]))
-            if existing:
-                print(f"{site['name']}: already registered as {existing.collector_id}")
-                registered += 1
-                continue
-            try:
-                collector_id = cli.create(site["url"], FIELD_DESCRIPTION, f"sentinelscrape-{slug}-laptops")
+        if existing:
+            print(f"{site['name']}: already registered as {existing.collector_id}")
+            registered += 1
+            continue
+        try:
+            collector_id = cli.create(site["url"], FIELD_DESCRIPTION, f"sentinelscrape-{slug}-laptops")
+        except Exception as exc:
+            failures.append(f"{site['name']}: {exc}")
+            print(f"{site['name']}: failed — {exc}", file=sys.stderr)
+            continue
+        try:
+            with SessionLocal() as db:
                 db.add(Collector(collector_id=collector_id, site_name=site["name"], category="laptops"))
                 db.commit()
-                registered += 1
-                print(f"{site['name']}: registered {collector_id}")
-            except Exception as exc:
-                db.rollback()
-                failures.append(f"{site['name']}: {exc}")
-                print(f"{site['name']}: failed — {exc}", file=sys.stderr)
+            registered += 1
+            print(f"{site['name']}: registered {collector_id}")
+        except Exception as exc:
+            failures.append(f"{site['name']}: database save failed: {exc}")
+            print(f"{site['name']}: database save failed — {exc}", file=sys.stderr)
 
     if failures:
         print("Collector bootstrap warnings:\n" + "\n".join(failures), file=sys.stderr)
