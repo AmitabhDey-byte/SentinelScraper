@@ -15,12 +15,13 @@ from app.config import settings
 from app.db.models import Collector, Incident, PriceHistory, Product, Run
 from app.db.session import SessionLocal
 from app.orchestration.brightdata import BrightDataCLI
-from app.services.diff_detector import SnapshotDiff, compare_snapshots, normalize_snapshot
+from app.services.diff_detector import SnapshotDiff, compare_snapshots, completeness_baseline, normalize_snapshot
 from app.services.narration import GeminiNarrator
 
 
 OUTPUT_DIR = Path(__file__).resolve().parents[2] / "output"
-INLINE_SNAPSHOT_PREFIX = "snapshot:"
+COMPLETENESS_BASELINE_PREFIX = "baseline:"
+LEGACY_INLINE_SNAPSHOT_PREFIX = "snapshot:"
 
 
 def _now() -> datetime:
@@ -51,8 +52,10 @@ def _rows(snapshot: Any) -> list[dict[str, Any]]:
 def _load_json(path: str | None) -> Any:
     if not path:
         return None
-    if path.startswith(INLINE_SNAPSHOT_PREFIX):
-        return json.loads(path.removeprefix(INLINE_SNAPSHOT_PREFIX))
+    if path.startswith(COMPLETENESS_BASELINE_PREFIX):
+        return json.loads(path.removeprefix(COMPLETENESS_BASELINE_PREFIX))
+    if path.startswith(LEGACY_INLINE_SNAPSHOT_PREFIX):
+        return json.loads(path.removeprefix(LEGACY_INLINE_SNAPSHOT_PREFIX))
     candidate = Path(path)
     if not candidate.is_absolute():
         candidate = Path(__file__).resolve().parents[2] / candidate
@@ -135,43 +138,63 @@ def run_collector(db: Session, collector: Collector, cli: BrightDataCLI, output_
     """Run one collector, persist its snapshot, and open an incident if needed."""
 
     started_at = _now()
-    output_path = output_dir / f"{collector.collector_id}_{started_at.strftime('%Y%m%dT%H%M%SZ')}.json"
+    collector_id = collector.id
+    collector_ref = collector.collector_id
+    collector_url = _collector_url(collector)
+    output_path = output_dir / f"{collector_ref}_{started_at.strftime('%Y%m%dT%H%M%SZ')}.json"
     previous_run = _latest_successful_run(db, collector)
+    previous_ref = previous_run.raw_json_ref if previous_run else None
+    db.commit()
     try:
-        cli.run(collector.collector_id, _collector_url(collector), output_path)
+        cli.run(collector_ref, collector_url, output_path)
         snapshot = json.loads(output_path.read_text(encoding="utf-8"))
         rows = _rows(snapshot)
+        persisted_collector = db.get(Collector, collector_id)
+        if persisted_collector is None:
+            raise ValueError("Collector was removed while its run was in progress")
         run = Run(
-            collector_id_fk=collector.id,
+            collector_id_fk=collector_id,
             run_at=started_at,
             row_count=len(rows),
-            # Keep the baseline in Neon as well as on ephemeral worker disk so
-            # the next Render or GitHub Actions run can still perform its diff.
-            raw_json_ref=f"{INLINE_SNAPSHOT_PREFIX}{json.dumps(snapshot, separators=(',', ':'))}",
+            raw_json_ref=f"{COMPLETENESS_BASELINE_PREFIX}{json.dumps(completeness_baseline(snapshot), separators=(',', ':'))}",
             status="success",
         )
         db.add(run)
         db.flush()
 
-        if previous_run and previous_run.raw_json_ref:
-            previous_snapshot = _load_json(previous_run.raw_json_ref)
+        if previous_ref:
+            previous_snapshot = _load_json(previous_ref)
             diff = compare_snapshots(previous_snapshot, snapshot)
-            _create_incident_if_new(db, collector, diff, started_at)
+            _create_incident_if_new(db, persisted_collector, diff, started_at)
 
-        _upsert_products(db, collector, snapshot, started_at)
+        _upsert_products(db, persisted_collector, snapshot, started_at)
         db.commit()
         return run
     except Exception:
-        db.rollback()
-        failed_run = Run(
-            collector_id_fk=collector.id,
-            run_at=started_at,
-            row_count=0,
-            raw_json_ref=str(output_path) if output_path.exists() else None,
-            status="failed",
-        )
-        db.add(failed_run)
-        db.commit()
+        try:
+            db.rollback()
+            failed_run = Run(
+                collector_id_fk=collector_id,
+                run_at=started_at,
+                row_count=0,
+                raw_json_ref=str(output_path) if output_path.exists() else None,
+                status="failed",
+            )
+            db.add(failed_run)
+            db.commit()
+        except Exception:
+            db.close()
+            with SessionLocal() as failure_db:
+                failure_db.add(
+                    Run(
+                        collector_id_fk=collector_id,
+                        run_at=started_at,
+                        row_count=0,
+                        raw_json_ref=str(output_path) if output_path.exists() else None,
+                        status="failed",
+                    )
+                )
+                failure_db.commit()
         raise
 
 
@@ -209,36 +232,51 @@ def heal_incident(
         raise ValueError(f"Collector for incident {incident_id} does not exist")
 
     healed_at = _now()
-    output_path = output_dir / f"{collector.collector_id}_heal_{incident.id}_{healed_at.strftime('%Y%m%dT%H%M%SZ')}.json"
+    collector_id = collector.id
+    collector_ref = collector.collector_id
+    site_name = collector.site_name
+    collector_url = _collector_url(collector)
+    dropped_fields = list(incident.dropped_fields)
+    rows_prev = incident.rows_prev
+    previous_run = _latest_successful_run(db, collector)
+    previous_ref = previous_run.raw_json_ref if previous_run else None
+    db.commit()
+    output_path = output_dir / f"{collector_ref}_heal_{incident_id}_{healed_at.strftime('%Y%m%dT%H%M%SZ')}.json"
     hint = (
-        f"The extraction fields {', '.join(incident.dropped_fields)} dropped below 20% completeness. "
+        f"The extraction fields {', '.join(dropped_fields)} dropped below 20% completeness. "
         "Restore the requested listing fields and preserve product title, price, stock status, "
         "seller or brand, rating, product image URL, and listing URL."
     )
-    cli.heal(collector.collector_id, _collector_url(collector), hint, output_path)
+    cli.heal(collector_ref, collector_url, hint, output_path)
     healed_snapshot = json.loads(output_path.read_text(encoding="utf-8"))
-    previous_run = _latest_successful_run(db, collector)
-    previous_snapshot = _load_json(previous_run.raw_json_ref) if previous_run and previous_run.raw_json_ref else []
+    previous_snapshot = _load_json(previous_ref) if previous_ref else []
     recovery_diff = compare_snapshots(previous_snapshot, healed_snapshot)
 
     if not approve:
-        return incident
+        pending_incident = db.get(Incident, incident_id)
+        if pending_incident is None:
+            raise ValueError(f"Incident {incident_id} was removed while its heal was in progress")
+        return pending_incident
 
-    recovery_fields = sorted(set(incident.dropped_fields) & set(recovery_diff.recovered_fields))
+    recovery_fields = sorted(set(dropped_fields) & set(recovery_diff.recovered_fields))
     if not recovery_fields:
         raise ValueError("Bright Data heal did not recover any dropped field; approval was not recorded")
 
-    cli.approve(collector.collector_id)
+    cli.approve(collector_ref)
 
     combined_diff = SnapshotDiff(
-        rows_prev=incident.rows_prev,
+        rows_prev=rows_prev,
         rows_curr=len(_rows(healed_snapshot)),
-        dropped_fields=incident.dropped_fields,
+        dropped_fields=dropped_fields,
         recovered_fields=recovery_fields,
         previous_completeness={},
         current_completeness={},
     )
-    narration = narrator.narrate(site_name=collector.site_name, diff=combined_diff)
+    narration = narrator.narrate(site_name=site_name, diff=combined_diff)
+    incident = db.get(Incident, incident_id)
+    collector = db.get(Collector, collector_id)
+    if incident is None or collector is None:
+        raise ValueError("Collector incident was removed while its heal was in progress")
     incident.recovered_fields = recovery_fields
     incident.rows_curr = combined_diff.rows_curr
     incident.healed_at = healed_at
@@ -253,10 +291,14 @@ def run_once(cli: BrightDataCLI | None = None) -> list[str]:
     cli = cli or BrightDataCLI()
     failures: list[str] = []
     with SessionLocal() as db:
-        collectors = db.scalars(select(Collector).order_by(Collector.site_name)).all()
-        if not collectors:
+        collector_ids = list(db.scalars(select(Collector.id).order_by(Collector.site_name)))
+        if not collector_ids:
             return ["No collectors are registered. Run scripts/bootstrap_collectors.py first."]
-        for collector in collectors:
+    for collector_id in collector_ids:
+        with SessionLocal() as db:
+            collector = db.get(Collector, collector_id)
+            if collector is None:
+                continue
             try:
                 run_collector(db, collector, cli)
             except Exception as exc:

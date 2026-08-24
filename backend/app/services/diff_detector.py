@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 
 SnapshotRow = Mapping[str, Any]
 SnapshotInput = Sequence[SnapshotRow] | Mapping[str, Any]
+COMPLETENESS_BASELINE_KEY = "_sentinelscrape_completeness"
 
 
 @dataclass(frozen=True)
@@ -77,13 +78,35 @@ def field_completeness(snapshot: SnapshotInput) -> dict[str, float]:
     }
 
 
+def completeness_baseline(snapshot: SnapshotInput) -> dict[str, Any]:
+    """Compact, persistent evidence for a future completeness comparison."""
+
+    rows = normalize_snapshot(snapshot)
+    return {
+        COMPLETENESS_BASELINE_KEY: {
+            "row_count": len(rows),
+            "fields": field_completeness(rows),
+        }
+    }
+
+
+def _completeness_data(snapshot: SnapshotInput) -> tuple[int, dict[str, float]]:
+    if isinstance(snapshot, Mapping):
+        baseline = snapshot.get(COMPLETENESS_BASELINE_KEY)
+        if isinstance(baseline, Mapping):
+            fields = baseline.get("fields", {})
+            row_count = baseline.get("row_count", 0)
+            if isinstance(fields, Mapping) and isinstance(row_count, int):
+                return row_count, {str(field): float(rate) for field, rate in fields.items()}
+    rows = normalize_snapshot(snapshot)
+    return len(rows), field_completeness(rows)
+
+
 def compare_snapshots(previous: SnapshotInput, current: SnapshotInput) -> SnapshotDiff:
     """Compare per-field completeness and return dropped/recovered fields."""
 
-    previous_rows = normalize_snapshot(previous)
-    current_rows = normalize_snapshot(current)
-    previous_completeness = field_completeness(previous_rows)
-    current_completeness = field_completeness(current_rows)
+    previous_rows, previous_completeness = _completeness_data(previous)
+    current_rows, current_completeness = _completeness_data(current)
     fields = sorted(set(previous_completeness) | set(current_completeness))
 
     dropped_fields = [
@@ -100,11 +123,10 @@ def compare_snapshots(previous: SnapshotInput, current: SnapshotInput) -> Snapsh
     ]
 
     return SnapshotDiff(
-        rows_prev=len(previous_rows),
-        rows_curr=len(current_rows),
+        rows_prev=previous_rows,
+        rows_curr=current_rows,
         dropped_fields=dropped_fields,
         recovered_fields=recovered_fields,
         previous_completeness={field: previous_completeness.get(field, 0.0) for field in fields},
         current_completeness={field: current_completeness.get(field, 0.0) for field in fields},
     )
-

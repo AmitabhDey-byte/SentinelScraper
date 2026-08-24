@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from app.services.diff_detector import (
+    completeness_baseline,
     compare_snapshots,
     field_completeness,
     is_non_empty,
@@ -83,3 +84,12 @@ def test_normalize_snapshot_accepts_listings_wrapper_and_rejects_unknown_shape()
     with pytest.raises(ValueError, match="row list"):
         normalize_snapshot({"unexpected": rows})
 
+
+def test_compact_baseline_preserves_the_exact_diff_thresholds():
+    previous = [{"title": "Laptop", "rating": "4.5"} for _ in range(5)]
+    current = [{"title": "Laptop", "rating": ""} for _ in range(5)]
+
+    result = compare_snapshots(completeness_baseline(previous), current)
+
+    assert result.rows_prev == 5
+    assert result.dropped_fields == ["rating"]
